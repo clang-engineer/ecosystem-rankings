@@ -132,3 +132,21 @@ test('README candidates are not rejected by global keyword blacklists', async ()
   assert.equal(data.categories[0].readmeStats.candidates,3);
   assert.equal(data.categories[0].readmeStats.accepted,3);
 });
+
+test('collects optional GitHub repository metadata without extra requests', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'ecosystem-rankings-'));
+  const config=join(dir,'ecosystems.json'),output=join(dir,'rankings.json'),history=join(dir,'history.json');
+  await writeFile(config,JSON.stringify({ecosystems:[{id:'tools',name:'Tools',source:'github',topic:'terminal-tool'}]}));
+  let calls=0;
+  const fetchImpl=async()=>{calls++;return {ok:true,json:async()=>({items:[{full_name:'owner/tool',name:'tool',html_url:'https://github.com/owner/tool',stargazers_count:42,forks_count:8,created_at:'2020-01-01T00:00:00Z',pushed_at:'2026-11-20T00:00:00Z',updated_at:'2026-11-20T00:00:00Z',language:'Rust',license:{spdx_id:'MIT'},topics:['terminal-tool'],homepage:'https://example.org'}]})}}};
+  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
+  const item=JSON.parse(await readFile(output,'utf8')).categories[0].items[0];
+  assert.equal(item.forks,8);
+  assert.equal(item.language,'Rust');
+  assert.equal(item.license,'MIT');
+  assert.equal(item.createdAt,'2020-01-01T00:00:00Z');
+  assert.equal(item.pushedAt,'2026-11-20T00:00:00Z');
+  assert.deepEqual(item.topics,['terminal-tool']);
+  assert.equal(item.homepage,'https://example.org');
+  assert.equal(calls,1);
+});
