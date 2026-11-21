@@ -87,3 +87,21 @@ ecosystems:
 ```
 
 The collector writes `periods` and `defaultPeriod` into `rankings.json`; the Viewer requires no separate period attribute. Custom periods require historical snapshots of at least that age. History retention scales to the longest configured period (plus five days). JSON input remains supported via `--config` for backward compatibility.
+
+## Discovery modes and exclusions
+
+Set `discovery: curated` to rank **only** the explicitly listed `repositories` (recommended for narrowly defined categories). Use `discovery: topic` to merge GitHub Topic search results with the explicit list. The default is `topic` when a topic is provided, otherwise `curated`.
+
+```yaml
+  - id: tmux-plugins
+    name: tmux Plugins
+    source: github
+    discovery: curated
+    repositories:
+      - tmux-plugins/tpm
+      - tmux-plugins/tmux-yank
+    exclude:
+      - some-owner/unrelated-repository
+```
+
+`exclude` removes repositories case-insensitively, including explicitly listed repositories. Curated rankings prioritize category precision over exhaustive discovery; maintainers should review and expand their lists periodically.
