@@ -16,11 +16,11 @@ const [command, ...args] = process.argv.slice(2);
 const option = (flag, fallback) => { const i = args.indexOf(flag); return i >= 0 && args[i+1] ? args[i+1] : fallback; };
 try {
   if (command === 'init') {
-    await copyIfAbsent('ecosystems.json', resolve(cwd, 'ecosystems.json'));
+    await copyIfAbsent('ecosystems.yml', resolve(cwd, 'ecosystems.yml'));
     await copyIfAbsent('collect.yml', resolve(cwd, '.github/workflows/ecosystem-rankings.yml'));
-    console.log('Edit ecosystems.json, then run: ecosystem-rankings collect');
+    console.log('Edit ecosystems.yml, then run: ecosystem-rankings collect');
   } else if (command === 'collect') {
-    await collect({ config: resolve(cwd, option('--config', 'ecosystems.json')), output: resolve(cwd, option('--output', 'data/rankings.json')), history: resolve(cwd, option('--history', 'data/history.json')), token: process.env.GITHUB_TOKEN });
+    await collect({ config: resolve(cwd, option('--config', 'ecosystems.yml')), output: resolve(cwd, option('--output', 'data/rankings.json')), history: resolve(cwd, option('--history', 'data/history.json')), token: process.env.GITHUB_TOKEN });
   } else {
     console.log('Usage: ecosystem-rankings init | collect [--config path] [--output path] [--history path]');
     if (command) process.exitCode = 1;
