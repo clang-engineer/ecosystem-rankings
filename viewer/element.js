@@ -34,7 +34,7 @@ class EcosystemRankings extends HTMLElement {
     const total = category?.items?.length || 0;
     const rankingBasis = this.period === "0" || fallback ? "누적 GitHub Stars순" : `최근 ${this.period}일 Stars 증가량순`;
     const criteria = category?.discovery === 'topic'
-      ? `<details class="er-criteria"><summary>검색 기준 보기</summary><div class="er-criteria-body"><div><strong>Topic</strong> ${category.topic ? escape(category.topic) : '없음'}</div><div><strong>검색어</strong> ${Array.isArray(category.searches) && category.searches.length ? category.searches.map(q => `<code>${escape(q)}</code>`).join(' · ') : '없음'}</div><div><strong>후보 정렬</strong> ${Array.isArray(category.searchSorts) && category.searchSorts.length ? category.searchSorts.map(sort => sort === 'stars' ? 'Stars순' : sort === 'best-match' ? '관련도순' : sort).join(' + ') : category.searchSort === 'stars' ? 'Stars순' : '정보 없음'}</div><p>현재 검색 결과와 이전에 발견해 계속 추적 중인 프로젝트가 함께 포함될 수 있습니다.</p></div></details>`
+      ? `<details class="er-criteria"><summary>검색 기준 보기</summary><div class="er-criteria-body"><div><strong>Topic</strong> ${category.topic ? escape(category.topic) : '없음'}</div><div><strong>검색어</strong> ${Array.isArray(category.searches) && category.searches.length ? category.searches.map(q => `<code>${escape(q)}</code>`).join(' · ') : '없음'}</div><div><strong>후보 정렬</strong> ${category.searchSort === 'stars' ? '누적 Stars 내림차순' : '정보 없음'}</div><p>현재 검색 결과와 이전에 발견해 계속 추적 중인 프로젝트가 함께 포함될 수 있습니다.</p></div></details>`
       : category?.discovery === 'curated' ? '<details class="er-criteria"><summary>검색 기준 보기</summary><div class="er-criteria-body">지정된 저장소 목록을 수집합니다.</div></details>' : '';
     const list = !category
       ? '<p>등록된 분야가 없습니다.</p>'
