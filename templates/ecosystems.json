@@ -1,0 +1,18 @@
+{
+  "ecosystems": [
+    {
+      "id": "terminal-file-managers",
+      "name": "Terminal File Managers",
+      "source": "github",
+      "topic": "terminal-file-manager",
+      "limit": 20
+    },
+    {
+      "id": "neovim-plugins",
+      "name": "Neovim Plugins",
+      "source": "github",
+      "topic": "neovim-plugin",
+      "limit": 20
+    }
+  ]
+}
