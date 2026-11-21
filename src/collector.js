@@ -70,8 +70,8 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
         // admission to a self-description near the start of the README.
         const introLines = intro.split('\n').filter(line => line.trim() && !/^\s*(!?\[|<|#|\*\*?\s*https?:)/.test(line)).slice(0, 12).join(' ');
         if (!introLines.includes(expected)) continue;
-        // Avoid obvious plugin/theme/config collections masquerading as a tool.
-        if (/\b(plugin|plugins|theme|themes|dotfiles|configuration|config collection|list of|including|awesome list)\b/.test(introLines.slice(0, 350))) continue;
+        // Do not reject candidates based on generic words such as plugin or theme.
+        // These terms can be legitimate in other ecosystem categories.
         merged.set(repo.full_name.toLowerCase(), normalize(repo));
         readmeStats.accepted++;
       }
