@@ -126,3 +126,7 @@ Set `discovery: curated` to rank **only** the explicitly listed `repositories` (
 ```
 
 Search results are candidates rather than guaranteed category members. GitHub repository search may include adjacent tools; use targeted queries and `exclude` to improve precision. Each query uses a GitHub Search API request and is subject to rate limits.
+
+## Historical Stars pilot (not enabled in production)
+
+`src/stargazers-pilot.js` exposes `estimateRecentStars` to inspect a limited number of GitHub Stargazers API pages (dated `starred_at` responses). It returns `retainedStarsAdded` only when the requested period is fully covered within the page budget; otherwise it returns `null` and `complete: false`. This is **not** the net change in Stars: unstar events are not recoverable. It does not alter `history.json`, `rankings.json`, or the Viewer, and should not be mixed into snapshot-based growth rankings without an explicit metric label and validation.
