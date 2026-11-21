@@ -16,3 +16,20 @@ test('collects GitHub topic data and computes week/month only with history', asy
   assert.equal(data.categories[0].items[0].week,10);
   assert.equal(data.categories[0].items[0].month,17);
 });
+
+test('merges explicit repositories, deduplicates topic results, and sorts by stars', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ ecosystems: [{ id: 'files', name: 'Files', source: 'github', topic: 'terminal-file-manager', repositories: ['owner/popular','owner/existing'] }] }));
+  const requests = [];
+  const makeRepo = (name, stars) => ({ full_name: name, name: name.split('/')[1], html_url: 'https://github.com/'+name, description: '', stargazers_count: stars });
+  const fetchImpl = async url => {
+    requests.push(url);
+    const body = url.includes('/search/repositories') ? { items: [makeRepo('owner/existing', 5)] } : makeRepo('owner/popular', 100);
+    return { ok: true, json: async () => body };
+  };
+  await collect({ config, output, history, fetchImpl, now: new Date('2026-11-21T00:00:00Z') });
+  const data = JSON.parse(await readFile(output, 'utf8'));
+  assert.deepEqual(data.categories[0].items.map(x=>x.id), ['owner/popular','owner/existing']);
+  assert.equal(requests.length, 2);
+});
