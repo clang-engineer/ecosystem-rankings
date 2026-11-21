@@ -22,7 +22,7 @@ The viewer reads the generated JSON. For an existing Jekyll site, place the mark
 <script type="module" src="https://cdn.jsdelivr.net/gh/clang-engineer/ecosystem-rankings@main/viewer/element.js"></script>
 ```
 
-For production, pin the Action and CDN URL to a release or commit SHA.
+Set the initial Viewer period with the optional `period` attribute: `all` (default), `week`, or `month`. For example, `<ecosystem-rankings src="/data/rankings.json" period="week"></ecosystem-rankings>`. Users can still change the period in the Viewer. Weekly/monthly data only appears once enough history has accumulated.\n\nFor production, pin the Action and CDN URL to a release or commit SHA.
 
 ## Ranking semantics
 
