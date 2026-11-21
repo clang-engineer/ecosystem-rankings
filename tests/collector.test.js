@@ -115,7 +115,7 @@ test('ignores an empty existing rankings file on first collection', async () => 
   assert.equal(JSON.parse(await readFile(output,'utf8')).categories.length,1);
 });
 
-test('README candidate must describe itself as the category and not a plugin', async () => {
+test('README candidates are not rejected by global keyword blacklists', async () => {
   const dir=await mkdtemp(join(tmpdir(),'ecosystem-rankings-'));
   const config=join(dir,'ecosystems.json'),output=join(dir,'rankings.json'),history=join(dir,'history.json');
   await writeFile(config,JSON.stringify({ecosystems:[{id:'mux',name:'Multiplexers',source:'github',topic:'terminal-multiplexer',readme_searches:['terminal multiplexer'],limit:10}]}));
@@ -128,7 +128,7 @@ test('README candidate must describe itself as the category and not a plugin', a
   };
   await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
   const data=JSON.parse(await readFile(output,'utf8'));
-  assert.deepEqual(data.categories[0].items.map(x=>x.id),['org/tool']);
+  assert.deepEqual(data.categories[0].items.map(x=>x.id),['org/tool','org/plugin','org/list']);
   assert.equal(data.categories[0].readmeStats.candidates,3);
-  assert.equal(data.categories[0].readmeStats.accepted,1);
+  assert.equal(data.categories[0].readmeStats.accepted,3);
 });
