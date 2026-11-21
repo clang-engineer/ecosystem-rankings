@@ -105,3 +105,24 @@ Set `discovery: curated` to rank **only** the explicitly listed `repositories` (
 ```
 
 `exclude` removes repositories case-insensitively, including explicitly listed repositories. Curated rankings prioritize category precision over exhaustive discovery; maintainers should review and expand their lists periodically.
+
+## Automatic discovery with multiple queries
+
+`discovery: topic` combines a GitHub Topic search with up to five additional GitHub repository search queries. `repositories` remains an optional inclusion list for major projects missing from searches, and `exclude` removes known mismatches. Results are deduplicated case-insensitively and sorted by Stars.
+
+```yaml
+- id: tmux-plugins
+  name: tmux Plugins
+  source: github
+  discovery: topic
+  topic: tmux-plugin
+  searches:
+    - "tmux plugin in:name,description"
+  limit: 100
+  repositories:
+    - tmux-plugins/tpm
+  exclude:
+    - some-owner/unrelated-project
+```
+
+Search results are candidates rather than guaranteed category members. GitHub repository search may include adjacent tools; use targeted queries and `exclude` to improve precision. Each query uses a GitHub Search API request and is subject to rate limits.
