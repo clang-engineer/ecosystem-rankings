@@ -82,3 +82,32 @@ test('automatic discovery combines topic and search queries without duplicates',
   assert.deepEqual(data.categories[0].items.map(x=>x.id), ['owner/known','owner/discovered','owner/topic']);
   assert.equal(requests.length,3);
 });
+
+test('retains a previously discovered repository when it falls out of search results', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ ecosystems: [{ id:'tools', name:'Tools', source:'github', topic:'terminal-tool' }] }));
+  const repo = (id, stars) => ({ full_name:id, name:id.split('/')[1], html_url:'https://github.com/'+id, description:'', stargazers_count:stars });
+  await writeFile(output, JSON.stringify({ categories:[{id:'tools',items:[{id:'owner/old',stars:10}]}] }));
+  await writeFile(history, JSON.stringify([{id:'owner/old',date:'2026-11-14',stars:10}]));
+  const requests = [];
+  const fetchImpl = async url => {
+    requests.push(url);
+    return { ok:true, json:async()=>url.includes('/search/') ? {items:[repo('owner/new',30)]} : repo('owner/old',15) };
+  };
+  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
+  const data=JSON.parse(await readFile(output,'utf8'));
+  assert.deepEqual(data.categories[0].items.map(x=>x.id), ['owner/new','owner/old']);
+  assert.equal(data.categories[0].items[1].periods['7'],5);
+  assert.ok(requests.some(url=>url.endsWith('/repos/owner/old')));
+});
+
+test('ignores an empty existing rankings file on first collection', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config=join(dir,'ecosystems.json'), output=join(dir,'rankings.json'), history=join(dir,'history.json');
+  await writeFile(config,JSON.stringify({ecosystems:[{id:'tools',name:'Tools',source:'github',topic:'terminal-tool'}]}));
+  await writeFile(output,'');
+  const fetchImpl=async()=>({ok:true,json:async()=>({items:[]})});
+  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
+  assert.equal(JSON.parse(await readFile(output,'utf8')).categories.length,1);
+});
