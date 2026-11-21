@@ -45,3 +45,21 @@ test('reads YAML periods and emits configured default', async () => {
   assert.equal(data.defaultPeriod, 7);
   assert.equal(data.categories[0].items[0].periods['7'], null);
 });
+
+test('curated mode skips topic search and exclude removes configured repositories', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ ecosystems: [{ id: 'test', name: 'Test', source: 'github', discovery: 'curated', topic: 'some-topic', repositories: ['owner/keep', 'owner/drop'], exclude: ['OWNER/DROP'] }] }));
+  const requests = [];
+  const fetchImpl = async url => {
+    requests.push(url);
+    const name = url.split('/repos/')[1];
+    return { ok:true, json:async()=>({full_name:name,name:name.split('/')[1],description:'',html_url:'https://github.com/'+name,stargazers_count:10}) };
+  };
+  await collect({config,output,history,now:new Date('2026-11-21T00:00:00Z'),fetchImpl});
+  const data = JSON.parse(await readFile(output,'utf8'));
+  assert.deepEqual(data.categories[0].items.map(item=>item.id), ['owner/keep']);
+  assert.equal(data.categories[0].discovery, 'curated');
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every(url => url.includes('/repos/')));
+});
