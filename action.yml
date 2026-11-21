@@ -1,0 +1,26 @@
+name: Ecosystem Rankings Collector
+description: Collect GitHub topic rankings into JSON files
+inputs:
+  config:
+    description: Config path
+    default: ecosystems.json
+  output:
+    description: Output path
+    default: data/rankings.json
+  history:
+    description: History path
+    default: data/history.json
+  token:
+    description: GitHub API token
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        CONFIG: ${{ inputs.config }}
+        OUTPUT: ${{ inputs.output }}
+        HISTORY: ${{ inputs.history }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: node "$ACTION_PATH/bin/cli.js" collect --config "$CONFIG" --output "$OUTPUT" --history "$HISTORY"
