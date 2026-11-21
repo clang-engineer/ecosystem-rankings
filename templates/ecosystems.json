@@ -5,14 +5,23 @@
       "name": "Terminal File Managers",
       "source": "github",
       "topic": "terminal-file-manager",
-      "limit": 20
+      "limit": 20,
+      "repositories": [
+        "sxyazi/yazi",
+        "ranger/ranger",
+        "gokcehan/lf"
+      ]
     },
     {
       "id": "neovim-plugins",
       "name": "Neovim Plugins",
       "source": "github",
       "topic": "neovim-plugin",
-      "limit": 20
+      "limit": 20,
+      "repositories": [
+        "folke/lazy.nvim",
+        "nvim-telescope/telescope.nvim"
+      ]
     }
   ]
 }
