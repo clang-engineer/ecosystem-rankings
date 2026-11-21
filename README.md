@@ -29,7 +29,7 @@ For production, pin the Action and CDN URL to a release or commit SHA.
 - **All:** current cumulative GitHub Stars.
 - **Week/month:** current Stars minus a snapshot from at least 7/30 days ago.
 - Missing history means **collecting**, not zero growth.
-- Topic search currently selects top repositories by cumulative Stars. A project outside that set cannot appear in the growth rankings.
+- Topic search selects top repositories by cumulative Stars, **plus any explicitly listed repositories**. Other repositories outside that set cannot appear in growth rankings.
 - npm, Gradle, and Pi-specific collectors are future work.
 
 The project is a reusable collector + Web Component, not a hosted ranking service. Each user runs the Action in their own repository and chooses their own topics.
@@ -47,3 +47,24 @@ This is an early preview. GitHub Topic search can miss repositories without the 
 ## Repository ownership
 
 The package repository contains only reusable code and templates. Each consumer repository owns its own `ecosystems.json`, `.github/workflows/ecosystem-rankings.yml`, `data/rankings.json`, and `data/history.json`. For example, the author's blog runs the collector inside `clang-engineer.github.io`; no collection job is scheduled in this package repository.
+
+## Topic discovery + explicit repositories
+
+A category may combine GitHub Topic discovery with known repositories that do not use the expected topic:
+
+```json
+{
+  "ecosystems": [
+    {
+      "id": "terminal-file-managers",
+      "name": "Terminal File Managers",
+      "source": "github",
+      "topic": "terminal-file-manager",
+      "limit": 30,
+      "repositories": ["sxyazi/yazi", "ranger/ranger", "gokcehan/lf"]
+    }
+  ]
+}
+```
+
+Explicit repositories are fetched individually, merged case-insensitively with topic results, deduplicated, and sorted by cumulative Stars. You can omit `topic` and specify only `repositories`. Each additional repository consumes a GitHub API request.
