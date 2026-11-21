@@ -54,7 +54,7 @@ class EcosystemRankings extends HTMLElement {
       ecosystem-rankings .er-rank { flex:0 0 2rem; font-variant-numeric:tabular-nums; color:var(--er-muted); font-weight:650; font-size:.82rem; }
       ecosystem-rankings .er-info { flex:1; min-width:0; overflow-wrap:anywhere; }
       ecosystem-rankings .er-info a { font-weight:650; font-size:.94rem; text-decoration:none; }
-      ecosystem-rankings .er-desc { font-size:.8rem; color:var(--er-muted); margin-top:.17rem; line-height:1.45; }
+      ecosystem-rankings .er-desc { font-size:.8rem; color:var(--er-muted); margin-top:.17rem; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
       ecosystem-rankings .er-score { text-align:right; white-space:nowrap; font-weight:700; font-size:.95rem; font-variant-numeric:tabular-nums; }
       ecosystem-rankings .er-score small { display:block; font-size:.7rem; color:var(--er-muted); font-weight:400; }
       ecosystem-rankings .er-empty { padding:2.5rem 1rem; text-align:center; color:var(--er-muted); }
