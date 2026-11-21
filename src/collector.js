@@ -25,11 +25,13 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     if (category.source !== 'github' || (category.topic && !/^[a-z0-9-]+$/i.test(category.topic))) throw Error(`Unsupported source or topic: ${category.id}`);
     const repositories = category.repositories ?? [];
     const exclude = category.exclude ?? [];
-    const mode = category.discovery ?? (category.topic ? 'topic' : 'curated');
+    const mode = category.discovery ?? (category.topic || category.searches?.length ? 'topic' : 'curated');
     if (!['topic', 'curated'].includes(mode)) throw Error(`Invalid discovery for ${category.id}`);
     if (!Array.isArray(exclude) || exclude.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid exclude for ${category.id}`);
     if (!Array.isArray(repositories) || repositories.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid repositories for ${category.id}`);
     if ((mode === 'curated' || !category.topic) && repositories.length === 0) throw Error(`Provide topic or repositories for ${category.id}`);
+    const searches = category.searches ?? [];
+    if (!Array.isArray(searches) || searches.length > 5 || searches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150)) throw Error(`Invalid searches for ${category.id}`);
     const limit = Math.min(100, Math.max(1, Number(category.limit) || 20));
     const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ecosystem-rankings', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const request = async url => {
@@ -38,10 +40,15 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       return response.json();
     };
     const normalize = repo => ({ id: repo.full_name, name: repo.name, description: repo.description || '', url: repo.html_url, stars: repo.stargazers_count });
-    const discovered = mode === 'topic' && category.topic
-      ? (await request(`https://api.github.com/search/repositories?q=${encodeURIComponent(`topic:${category.topic}`)}&sort=stars&order=desc&per_page=${limit}`)).items || []
-      : [];
-    const merged = new Map(discovered.map(repo => [repo.full_name.toLowerCase(), normalize(repo)]));
+    const queries = mode === 'topic' ? [...(category.topic ? [`topic:${category.topic}`] : []), ...searches] : [];
+    const merged = new Map();
+    for (const query of queries) {
+      const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${limit}`;
+      const result = await request(url);
+      for (const repo of result.items || []) {
+        if (!repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
+      }
+    }
     for (const name of repositories) {
       const key = name.toLowerCase();
       if (!merged.has(key)) {
