@@ -14,7 +14,7 @@ class EcosystemRankings extends HTMLElement {
       this.data = await response.json();
       if (!Array.isArray(this.data.categories)) throw Error('Invalid rankings data');
       this.category = this.data.categories[0]?.id;
-      this.period = 'all';
+      this.period = ['all', 'week', 'month'].includes(this.getAttribute('period')) ? this.getAttribute('period') : 'all';
       this.render();
     } catch (error) {
       this.innerHTML = '<p role="alert">랭킹 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>';
