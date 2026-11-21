@@ -3,7 +3,7 @@ description: Collect GitHub topic rankings into JSON files
 inputs:
   config:
     description: Config path
-    default: ecosystems.json
+    default: ecosystems.yml
   output:
     description: Output path
     default: data/rankings.json
@@ -16,6 +16,10 @@ inputs:
 runs:
   using: composite
   steps:
+    - shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: npm install --prefix "$ACTION_PATH" --omit=dev --no-audit --no-fund
     - shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.token }}
