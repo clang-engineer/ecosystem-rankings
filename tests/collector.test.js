@@ -114,3 +114,21 @@ test('ignores an empty existing rankings file on first collection', async () => 
   await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
   assert.equal(JSON.parse(await readFile(output,'utf8')).categories.length,1);
 });
+
+test('README candidate must describe itself as the category and not a plugin', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'ecosystem-rankings-'));
+  const config=join(dir,'ecosystems.json'),output=join(dir,'rankings.json'),history=join(dir,'history.json');
+  await writeFile(config,JSON.stringify({ecosystems:[{id:'mux',name:'Multiplexers',source:'github',topic:'terminal-multiplexer',readme_searches:['terminal multiplexer'],limit:10}]}));
+  const repo=id=>({full_name:id,name:id.split('/')[1],html_url:'https://github.com/'+id,description:'',stargazers_count:20});
+  const fetchImpl=async url=>{
+    if(url.includes('/search/') && url.includes('in%3Areadme'))return {ok:true,json:async()=>({items:[repo('org/tool'),repo('org/plugin'),repo('org/list')]})};
+    if(url.includes('/search/'))return {ok:true,json:async()=>({items:[]})};
+    const readme=url.includes('org/tool')?'# Tool\\nTool is a terminal multiplexer for interactive sessions.':url.includes('org/plugin')?'# Plugin\\nA terminal multiplexer plugin for status lines.':'# List\\nA list of useful command-line tools including a terminal multiplexer.';
+    return {ok:true,text:async()=>readme};
+  };
+  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
+  const data=JSON.parse(await readFile(output,'utf8'));
+  assert.deepEqual(data.categories[0].items.map(x=>x.id),['org/tool']);
+  assert.equal(data.categories[0].readmeStats.candidates,3);
+  assert.equal(data.categories[0].readmeStats.accepted,1);
+});
