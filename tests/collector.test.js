@@ -80,6 +80,9 @@ test('automatic discovery combines topic and search queries without duplicates',
   await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
   const data = JSON.parse(await readFile(output,'utf8'));
   assert.deepEqual(data.categories[0].items.map(x=>x.id), ['owner/known','owner/discovered','owner/topic']);
+  assert.deepEqual(data.categories[0].searches, ['tmux plugin in:name,description']);
+  assert.equal(data.categories[0].searchSort, 'stars');
+  assert.equal(data.categories[0].topic, 'tmux-plugin');
   assert.equal(requests.length,3);
 });
 
