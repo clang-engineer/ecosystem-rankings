@@ -2,7 +2,7 @@
 
 Configurable rankings for developer tools and plugin ecosystems.
 
-**Early preview:** GitHub Topic collection only; not yet published to npm.
+**Early preview:** GitHub Topic and repository keyword discovery; not yet published to npm.
 
 ## Try it
 
@@ -29,7 +29,7 @@ Set the initial Viewer period in `ecosystems.yml`: `viewer.default_period: 7`. T
 - **All:** current cumulative GitHub Stars.
 - **Numeric periods:** current Stars minus the most recent snapshot at or before the requested number of days ago.
 - Missing history means **collecting**, not zero growth. Defaults: `periods: [7, 30, 0]`, `viewer.default_period: 0`.
-- Topic search selects top repositories by cumulative Stars, **plus any explicitly listed repositories**. Other repositories outside that set cannot appear in growth rankings.
+- Topic and keyword searches discover candidates. Previously discovered repositories from the last generated rankings JSON are refreshed and retained even when they drop out of search results. A repository that has never been discovered cannot appear in growth rankings.
 - npm, Gradle, and Pi-specific collectors are future work.
 
 The project is a reusable collector + Web Component, not a hosted ranking service. Each user runs the Action in their own repository and chooses their own topics.
