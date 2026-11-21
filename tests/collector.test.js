@@ -13,8 +13,8 @@ test('collects GitHub topic data and computes week/month only with history', asy
   const fetchImpl = async () => ({ ok:true, json:async()=>({items:[{full_name:'owner/tool',name:'tool',description:'example',html_url:'https://github.com/owner/tool',stargazers_count:20}]}) });
   await collect({config,output,history,now:new Date('2026-11-21T00:00:00Z'),fetchImpl});
   const data=JSON.parse(await readFile(output,'utf8'));
-  assert.equal(data.categories[0].items[0].week,10);
-  assert.equal(data.categories[0].items[0].month,17);
+  assert.equal(data.categories[0].items[0].periods['7'],10);
+  assert.equal(data.categories[0].items[0].periods['30'],17);
 });
 
 test('merges explicit repositories, deduplicates topic results, and sorts by stars', async () => {
@@ -32,4 +32,16 @@ test('merges explicit repositories, deduplicates topic results, and sorts by sta
   const data = JSON.parse(await readFile(output, 'utf8'));
   assert.deepEqual(data.categories[0].items.map(x=>x.id), ['owner/popular','owner/existing']);
   assert.equal(requests.length, 2);
+});
+
+test('reads YAML periods and emits configured default', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.yml'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, 'viewer:\n  default_period: 7\nperiods: [7, 30, 0]\necosystems:\n  - id: test\n    name: Test\n    source: github\n    repositories:\n      - owner/tool\n');
+  const fetchImpl = async () => ({ ok:true, json:async()=>({full_name:'owner/tool',name:'tool',description:'',html_url:'https://github.com/owner/tool',stargazers_count:20}) });
+  await collect({config,output,history,now:new Date('2026-11-21T00:00:00Z'),fetchImpl});
+  const data = JSON.parse(await readFile(output, 'utf8'));
+  assert.deepEqual(data.periods, [7,30,0]);
+  assert.equal(data.defaultPeriod, 7);
+  assert.equal(data.categories[0].items[0].periods['7'], null);
 });
