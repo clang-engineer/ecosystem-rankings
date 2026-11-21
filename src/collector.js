@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, extname } from 'node:path';
 import YAML from 'yaml';
-const readJson = async (path, fallback) => JSON.parse(await readFile(path, 'utf8').catch(error => { if (error.code === 'ENOENT') return JSON.stringify(fallback); throw error; }));
+const readJson = async (path, fallback) => { const raw = await readFile(path, 'utf8').catch(error => { if (error.code === 'ENOENT') return ''; throw error; }); return raw.trim() ? JSON.parse(raw) : fallback; };
 const daysAgo = (date, days) => new Date(new Date(date).getTime() - days * 86400000).toISOString().slice(0, 10);
 function delta(history, id, days, today) {
   const cutoff = daysAgo(today, days);
@@ -20,6 +20,8 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
   if (!Array.isArray(settings?.ecosystems)) throw Error('Config requires ecosystems array');
   const date = now.toISOString().slice(0,10);
   let snapshots = await readJson(history, []);
+  const previous = await readJson(output, { categories: [] });
+  const previousByCategory = new Map((previous.categories || []).map(category => [category.id, category.items || []]));
   const categories = [];
   for (const category of settings.ecosystems) {
     if (category.source !== 'github' || (category.topic && !/^[a-z0-9-]+$/i.test(category.topic))) throw Error(`Unsupported source or topic: ${category.id}`);
@@ -54,6 +56,23 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       if (!merged.has(key)) {
         const repo = await request(`https://api.github.com/repos/${name.split('/').map(encodeURIComponent).join('/')}`);
         merged.set(repo.full_name.toLowerCase(), normalize(repo));
+      }
+    }
+    // Keep previously discovered repositories even when they fall out of search results.
+    // Refresh live Stars instead of copying stale values from the previous output.
+    if (mode === 'topic') {
+      const previousItems = previousByCategory.get(category.id) || [];
+      const excluded = new Set(exclude.map(name => name.toLowerCase()));
+      const missing = previousItems.filter(item => item.id && !merged.has(item.id.toLowerCase()) && !excluded.has(item.id.toLowerCase()));
+      for (let start = 0; start < missing.length; start += 8) {
+        const batch = missing.slice(start, start + 8);
+        const refreshed = await Promise.all(batch.map(async item => {
+          const response = await fetchImpl('https://api.github.com/repos/' + item.id.split('/').map(encodeURIComponent).join('/'), { headers });
+          if (response.status === 404 || response.status === 410) return null;
+          if (!response.ok) throw Error('GitHub API ' + response.status + ' refreshing ' + item.id + ': ' + (await response.text()).slice(0, 180));
+          return response.json();
+        }));
+        for (const repo of refreshed) if (repo && !repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
       }
     }
     for (const name of exclude) merged.delete(name.toLowerCase());
