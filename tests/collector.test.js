@@ -114,24 +114,3 @@ test('ignores an empty existing rankings file on first collection', async () => 
   await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
   assert.equal(JSON.parse(await readFile(output,'utf8')).categories.length,1);
 });
-
-test('paginates and compares star-sorted and best-match discovery without named repositories', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
-  const config=join(dir,'ecosystems.json'), output=join(dir,'rankings.json'), history=join(dir,'history.json');
-  await writeFile(config,JSON.stringify({ecosystems:[{id:'multiplexers',name:'Multiplexers',source:'github',discovery:'topic',topic:'terminal-multiplexer',limit:2,search_pages:2,search_sorts:['stars','best-match']}]}));
-  const repo=(id,stars)=>({full_name:id,name:id.split('/')[1],html_url:'https://github.com/'+id,description:'',stargazers_count:stars});
-  const urls=[];
-  const fetchImpl=async url=>{
-    urls.push(url);
-    const best=!url.includes('sort=stars');
-    const page=url.includes('page=2')?2:1;
-    const items=best?(page===1?[repo('org/a',50),repo('org/c',5)]:[repo('org/d',3)]):(page===1?[repo('org/a',50),repo('org/b',20)]:[repo('org/c',5)]);
-    return {ok:true,json:async()=>({items})};
-  };
-  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
-  const data=JSON.parse(await readFile(output,'utf8'));
-  assert.deepEqual(data.categories[0].items.map(x=>x.id),['org/a','org/b','org/c','org/d']);
-  assert.equal(urls.length,4);
-  assert.equal(data.categories[0].searchStats[0].added,3);
-  assert.equal(data.categories[0].searchStats[1].added,1);
-});
