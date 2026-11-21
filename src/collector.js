@@ -35,6 +35,10 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const searches = category.searches ?? [];
     if (!Array.isArray(searches) || searches.length > 5 || searches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150)) throw Error(`Invalid searches for ${category.id}`);
     const limit = Math.min(100, Math.max(1, Number(category.limit) || 20));
+    const searchPages = category.search_pages ?? 1;
+    const searchSorts = category.search_sorts ?? ['stars'];
+    if (!Number.isInteger(searchPages) || searchPages < 1 || searchPages > 10) throw Error('search_pages must be 1..10');
+    if (!Array.isArray(searchSorts) || !searchSorts.length || new Set(searchSorts).size !== searchSorts.length || searchSorts.some(sort => !['stars', 'best-match'].includes(sort))) throw Error('search_sorts must contain stars and/or best-match');
     const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ecosystem-rankings', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const request = async url => {
       const response = await fetchImpl(url, { headers });
@@ -44,11 +48,24 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const normalize = repo => ({ id: repo.full_name, name: repo.name, description: repo.description || '', url: repo.html_url, stars: repo.stargazers_count });
     const queries = mode === 'topic' ? [...(category.topic ? [`topic:${category.topic}`] : []), ...searches] : [];
     const merged = new Map();
+    const searchStats = [];
     for (const query of queries) {
-      const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=${limit}`;
-      const result = await request(url);
-      for (const repo of result.items || []) {
-        if (!repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
+      for (const sort of searchSorts) {
+        let added = 0;
+        for (let page = 1; page <= searchPages; page++) {
+          const sorting = sort === 'stars' ? '&sort=stars&order=desc' : '';
+          const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}${sorting}&per_page=${limit}&page=${page}`;
+          const result = await request(url);
+          const found = result.items || [];
+          for (const repo of found) {
+            if (repo.archived || repo.fork) continue;
+            const key = repo.full_name.toLowerCase();
+            if (!merged.has(key)) added++;
+            merged.set(key, normalize(repo));
+          }
+          if (found.length < limit) break;
+        }
+        searchStats.push({ query, sort, added });
       }
     }
     for (const name of repositories) {
@@ -78,7 +95,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     for (const name of exclude) merged.delete(name.toLowerCase());
     const items = [...merged.values()].sort((a,b) => b.stars - a.stars || a.id.localeCompare(b.id));
     for (const item of items) snapshots = snapshots.filter(row => !(row.id === item.id && row.date === date)).concat({ id: item.id, date, stars: item.stars });
-    categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, periods: Object.fromEntries(positive.map(days => [String(days), delta(snapshots,item.id,days,date)])) })) });
+    categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], searchSort: mode === 'topic' ? searchSorts.join(', ') : null, searchSorts: mode === 'topic' ? searchSorts : [], searchPages: mode === 'topic' ? searchPages : 0, searchStats, searchLimit: mode === 'topic' ? limit : null, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, periods: Object.fromEntries(positive.map(days => [String(days), delta(snapshots,item.id,days,date)])) })) });
   }
   snapshots = snapshots.filter(row => row.date >= daysAgo(date, maxDays + 5));
   await mkdir(dirname(output), { recursive: true });
