@@ -35,6 +35,8 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const searches = category.searches ?? [];
     if (!Array.isArray(searches) || searches.length > 5 || searches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150)) throw Error(`Invalid searches for ${category.id}`);
     const limit = Math.min(100, Math.max(1, Number(category.limit) || 20));
+    const readmeSearches = category.readme_searches ?? [];
+    if (!Array.isArray(readmeSearches) || readmeSearches.length > 3 || readmeSearches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150 || /\bin:/.test(q))) throw Error('Invalid readme_searches');
     const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ecosystem-rankings', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const request = async url => {
       const response = await fetchImpl(url, { headers });
@@ -49,6 +51,29 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       const result = await request(url);
       for (const repo of result.items || []) {
         if (!repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
+      }
+    }
+    // README results are only candidates: verify that the repository introduces itself
+    // as the requested type near the beginning of its README.
+    const readmeStats = { candidates: 0, accepted: 0 };
+    for (const phrase of mode === 'topic' ? readmeSearches : []) {
+      const result = await request(`https://api.github.com/search/repositories?q=${encodeURIComponent(phrase + ' in:readme')}&sort=stars&order=desc&per_page=${limit}`);
+      for (const repo of result.items || []) {
+        if (repo.archived || repo.fork || merged.has(repo.full_name.toLowerCase())) continue;
+        readmeStats.candidates++;
+        const response = await fetchImpl('https://api.github.com/repos/' + repo.full_name.split('/').map(encodeURIComponent).join('/') + '/readme', { headers: { ...headers, Accept: 'application/vnd.github.raw+json' } });
+        if (response.status === 404) continue;
+        if (!response.ok) throw Error('GitHub README API ' + response.status + ': ' + (await response.text()).slice(0,180));
+        const intro = (await response.text()).slice(0, 1800).toLowerCase();
+        const expected = phrase.toLowerCase().trim();
+        // A mention in a long list of alternatives is not enough. Restrict
+        // admission to a self-description near the start of the README.
+        const introLines = intro.split('\n').filter(line => line.trim() && !/^\s*(!?\[|<|#|\*\*?\s*https?:)/.test(line)).slice(0, 12).join(' ');
+        if (!introLines.includes(expected)) continue;
+        // Avoid obvious plugin/theme/config collections masquerading as a tool.
+        if (/\b(plugin|plugins|theme|themes|dotfiles|configuration|config collection)\b/.test(introLines.slice(0, 350))) continue;
+        merged.set(repo.full_name.toLowerCase(), normalize(repo));
+        readmeStats.accepted++;
       }
     }
     for (const name of repositories) {
@@ -78,7 +103,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     for (const name of exclude) merged.delete(name.toLowerCase());
     const items = [...merged.values()].sort((a,b) => b.stars - a.stars || a.id.localeCompare(b.id));
     for (const item of items) snapshots = snapshots.filter(row => !(row.id === item.id && row.date === date)).concat({ id: item.id, date, stars: item.stars });
-    categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, periods: Object.fromEntries(positive.map(days => [String(days), delta(snapshots,item.id,days,date)])) })) });
+    categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], readmeSearches: mode === 'topic' ? readmeSearches : [], readmeStats, searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, periods: Object.fromEntries(positive.map(days => [String(days), delta(snapshots,item.id,days,date)])) })) });
   }
   snapshots = snapshots.filter(row => row.date >= daysAgo(date, maxDays + 5));
   await mkdir(dirname(output), { recursive: true });
