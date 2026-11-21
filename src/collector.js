@@ -29,7 +29,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     if (!['topic', 'curated'].includes(mode)) throw Error(`Invalid discovery for ${category.id}`);
     if (!Array.isArray(exclude) || exclude.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid exclude for ${category.id}`);
     if (!Array.isArray(repositories) || repositories.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid repositories for ${category.id}`);
-    if ((mode === 'curated' || !category.topic) && repositories.length === 0) throw Error(`Provide topic or repositories for ${category.id}`);
+    if ((mode === 'curated' && repositories.length === 0) || (mode === 'topic' && !category.topic && !(category.searches?.length) && repositories.length === 0)) throw Error(`Provide topic, searches or repositories for ${category.id}`);
     const searches = category.searches ?? [];
     if (!Array.isArray(searches) || searches.length > 5 || searches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150)) throw Error(`Invalid searches for ${category.id}`);
     const limit = Math.min(100, Math.max(1, Number(category.limit) || 20));
