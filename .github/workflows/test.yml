@@ -13,6 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm install --no-audit --no-fund
       - run: npm test
       - run: node --check bin/cli.js && node --check src/collector.js && node --check viewer/element.js
       - name: Test CLI initialization
@@ -20,6 +21,6 @@ jobs:
           mkdir /tmp/ecosystem-rankings-test
           cd /tmp/ecosystem-rankings-test
           node "$GITHUB_WORKSPACE/bin/cli.js" init
-          test -f ecosystems.json
+          test -f ecosystems.yml
           test -f .github/workflows/ecosystem-rankings.yml
           node "$GITHUB_WORKSPACE/bin/cli.js" init
