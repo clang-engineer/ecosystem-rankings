@@ -7,14 +7,15 @@ Configurable rankings for developer tools and plugin ecosystems.
 ## Try it
 
 ```sh
-node bin/cli.js init
+npm install --save-dev github:clang-engineer/ecosystem-rankings
+npx ecosystem-rankings init
 # edit ecosystems.json
-GITHUB_TOKEN=... node bin/cli.js collect
+GITHUB_TOKEN=... npx ecosystem-rankings collect
 ```
 
 `init` adds `ecosystems.json` and `.github/workflows/ecosystem-rankings.yml` to an existing site without overwriting files. The workflow invokes this repository's reusable GitHub Action and commits `data/rankings.json` and `data/history.json` when changed.
 
-The viewer reads the generated JSON:
+The viewer reads the generated JSON. For an existing Jekyll site, place the markup in a dedicated tab or include:
 
 ```html
 <ecosystem-rankings src="/data/rankings.json"></ecosystem-rankings>
@@ -32,3 +33,13 @@ For production, pin the Action and CDN URL to a release or commit SHA.
 - npm, Gradle, and Pi-specific collectors are future work.
 
 The project is a reusable collector + Web Component, not a hosted ranking service. Each user runs the Action in their own repository and chooses their own topics.
+
+## Installation notes
+
+1. Install the package from GitHub (npm registry release is not available yet).
+2. Run `npx ecosystem-rankings init` from the **existing site repository**; this creates the config and workflow files.
+3. Edit `ecosystems.json`, commit, and push. Enable GitHub Actions and allow workflows to write repository contents.
+4. Run the `Update Ecosystem Rankings` workflow once from the Actions tab. Its output appears under `data/`.
+5. Embed the viewer with a `src` pointing at the generated JSON URL.
+
+This is an early preview. GitHub Topic search can miss repositories without the tag, and week/month rankings are only for repositories included in the cumulative-Stars search window. GitHub API and live site deployment have not yet been end-to-end verified.
