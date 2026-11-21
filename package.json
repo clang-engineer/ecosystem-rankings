@@ -1,0 +1,25 @@
+{
+  "name": "ecosystem-rankings",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Configurable GitHub topic rankings collector and embeddable viewer",
+  "bin": {
+    "ecosystem-rankings": "./bin/cli.js"
+  },
+  "exports": {
+    ".": "./viewer/element.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "viewer",
+    "templates"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
