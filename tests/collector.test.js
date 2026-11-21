@@ -63,3 +63,22 @@ test('curated mode skips topic search and exclude removes configured repositorie
   assert.equal(requests.length, 2);
   assert.ok(requests.every(url => url.includes('/repos/')));
 });
+
+test('automatic discovery combines topic and search queries without duplicates', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ ecosystems: [{ id:'tmux', name:'tmux', source:'github', discovery:'topic', topic:'tmux-plugin', searches:['tmux plugin in:name,description'], repositories:['owner/known'], exclude:['owner/unrelated'] }] }));
+  const requests = [];
+  const repo = (name, stars) => ({ full_name:name, name:name.split('/')[1], description:'', html_url:'https://github.com/'+name, stargazers_count:stars });
+  const fetchImpl = async url => {
+    requests.push(url);
+    const data = url.includes('topic%3Atmux-plugin') ? {items:[repo('owner/topic',20),repo('owner/unrelated',99)]}
+      : url.includes('/search/repositories') ? {items:[repo('owner/topic',20),repo('owner/discovered',30)]}
+      : repo('owner/known',40);
+    return {ok:true,json:async()=>data};
+  };
+  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
+  const data = JSON.parse(await readFile(output,'utf8'));
+  assert.deepEqual(data.categories[0].items.map(x=>x.id), ['owner/known','owner/discovered','owner/topic']);
+  assert.equal(requests.length,3);
+});
