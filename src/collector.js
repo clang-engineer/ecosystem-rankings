@@ -43,7 +43,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       if (!response.ok) throw Error(`GitHub API ${response.status}: ${(await response.text()).slice(0,180)}`);
       return response.json();
     };
-    const normalize = repo => ({ id: repo.full_name, name: repo.name, description: repo.description || '', url: repo.html_url, stars: repo.stargazers_count });
+    const normalize = repo => ({ id: repo.full_name, name: repo.name, description: repo.description || '', url: repo.html_url, stars: repo.stargazers_count, forks: repo.forks_count ?? null, createdAt: repo.created_at ?? null, pushedAt: repo.pushed_at ?? null, updatedAt: repo.updated_at ?? null, language: repo.language ?? null, license: repo.license?.spdx_id && repo.license.spdx_id !== 'NOASSERTION' ? repo.license.spdx_id : null, topics: repo.topics ?? [], homepage: repo.homepage || null });
     const queries = mode === 'topic' ? [...(category.topic ? [`topic:${category.topic}`] : []), ...searches] : [];
     const merged = new Map();
     for (const query of queries) {
