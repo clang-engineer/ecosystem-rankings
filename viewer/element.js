@@ -37,7 +37,7 @@ class EcosystemRankings extends HTMLElement {
       ? '<p>등록된 분야가 없습니다.</p>'
       : !items.length
         ? `<p class="er-empty" role="status">${this.period === '0' ? '등록된 프로젝트가 없습니다.' : '이 기간의 기록을 수집하고 있습니다. 데이터가 쌓이면 순위가 표시됩니다.'}</p>`
-        : `<ol class="er-list">${items.map((item, i) => `<li class="er-item"><span class="er-rank">${String(i + 1).padStart(2, "0")}</span><div class="er-info"><a href="${escape(item.url)}" target="_blank" rel="noopener noreferrer">${escape(item.id)}</a><div class="er-desc">${escape(item.description)}</div></div><span class="er-score">${number(score(item))}<small>${this.period === '0' || fallback ? 'Stars' : '+ Stars'}</small></span></li>`).join('')}</ol>`;
+        : `<ol class="er-list">${items.map((item, i) => `<li class="er-item"><span class="er-rank">${String(i + 1).padStart(2, "0")}</span><div class="er-info"><a href="${escape(item.url)}" target="_blank" rel="noopener noreferrer">${escape(item.id)}</a><div class="er-desc">${escape(item.description)}</div></div><span class="er-score">${this.period === '0' || fallback ? `<span>${number(item.stars)} ★</span>` : `<span>+${number(score(item))} <small class="er-inline-period">(${escape(this.period)}일)</small></span><small>누적 ${number(item.stars)} ★</small>`}</span></li>`).join('')}</ol>`;
     this.innerHTML = `<style>
       ecosystem-rankings { display:block; color:var(--text-color,inherit); --er-border:var(--main-border-color,#dce0e5); --er-muted:var(--text-muted-color,#747b86); }
       ecosystem-rankings .er-shell { border:1px solid var(--er-border); border-radius:14px; overflow:hidden; background:var(--card-bg,transparent); }
@@ -58,7 +58,7 @@ class EcosystemRankings extends HTMLElement {
       ecosystem-rankings .er-info a { font-weight:650; font-size:.94rem; text-decoration:none; }
       ecosystem-rankings .er-desc { font-size:.8rem; color:var(--er-muted); margin-top:.17rem; line-height:1.45; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
       ecosystem-rankings .er-score { text-align:right; white-space:nowrap; font-weight:700; font-size:.95rem; font-variant-numeric:tabular-nums; }
-      ecosystem-rankings .er-score small { display:block; font-size:.7rem; color:var(--er-muted); font-weight:400; }
+      ecosystem-rankings .er-score small { display:block; font-size:.7rem; color:var(--er-muted); font-weight:400; }\n      ecosystem-rankings .er-score .er-inline-period { display:inline; font-size:.72rem; }
       ecosystem-rankings .er-empty { padding:2.5rem 1rem; text-align:center; color:var(--er-muted); }
       ecosystem-rankings .er-footer { display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding:.7rem 1.15rem; border-top:1px solid var(--er-border); font-size:.73rem; color:var(--er-muted); }
       @media(max-width:640px) { ecosystem-rankings .er-toolbar { align-items:stretch; } ecosystem-rankings .er-controls { width:100%; } ecosystem-rankings label { flex:1; } ecosystem-rankings select { width:100%; } ecosystem-rankings .er-item { padding:.8rem; gap:.55rem; } ecosystem-rankings .er-rank { flex-basis:1.5rem; } }
