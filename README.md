@@ -13,7 +13,7 @@ npx ecosystem-rankings init
 GITHUB_TOKEN=... npx ecosystem-rankings collect
 ```
 
-`init` adds `ecosystems.json` and `.github/workflows/ecosystem-rankings.yml` to an existing site without overwriting files. The workflow invokes this repository's reusable GitHub Action and commits `data/rankings.json` and `data/history.json` when changed.
+`init` adds `ecosystems.json` and `.github/workflows/ecosystem-rankings.yml` to an existing site without overwriting files. The workflow invokes the reusable GitHub Action and commits `data/rankings.json` and `data/history.json` when changed.
 
 The viewer reads the generated JSON. For an existing Jekyll site, place the markup in a dedicated tab or include:
 
@@ -43,3 +43,7 @@ The project is a reusable collector + Web Component, not a hosted ranking servic
 5. Embed the viewer with a `src` pointing at the generated JSON URL.
 
 This is an early preview. GitHub Topic search can miss repositories without the tag, and week/month rankings are only for repositories included in the cumulative-Stars search window. GitHub API and live site deployment have not yet been end-to-end verified.
+
+## Repository ownership
+
+The package repository contains only reusable code and templates. Each consumer repository owns its own `ecosystems.json`, `.github/workflows/ecosystem-rankings.yml`, `data/rankings.json`, and `data/history.json`. For example, the author's blog runs the collector inside `clang-engineer.github.io`; no collection job is scheduled in this package repository.
