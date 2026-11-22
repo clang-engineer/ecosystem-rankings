@@ -65,6 +65,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const merged = new Map();
     const previousItems = previousByCategory.get(category.id) || [];
     let readmeChecks = 0;
+    const staleIds = new Set();
     for (const query of queries) {
       const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query + (minStars ? ` stars:>=${minStars}` : ''))}&sort=stars&order=desc&per_page=${limit}`;
       const result = await request(url);
@@ -118,6 +119,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
         // Their Stars remain at the last observed value until refreshed by search or a later run.
         if (previousRefreshes >= MAX_PREVIOUS_REFRESHES) {
           merged.set(item.id.toLowerCase(), { ...item });
+          staleIds.add(item.id.toLowerCase());
           continue;
         }
         previousRefreshes++;
@@ -127,8 +129,8 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     }
     for (const name of exclude) merged.delete(name.toLowerCase());
     const items = [...merged.values()].filter(item => Number.isFinite(item.stars) && item.stars >= minStars).sort((a,b) => b.stars - a.stars || a.id.localeCompare(b.id));
-    for (const item of items) snapshots = snapshots.filter(row => !(row.id === item.id && row.date === date)).concat({ id: item.id, date, stars: item.stars });
-    categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], readmeSearches: mode === 'topic' ? readmeSearches : [], readmeStats, searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, minStars, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, periods: Object.fromEntries(positive.map(days => [String(days), delta(snapshots,item.id,days,date)])) })) });
+    for (const item of items) if (!staleIds.has(item.id.toLowerCase())) snapshots = snapshots.filter(row => !(row.id === item.id && row.date === date)).concat({ id: item.id, date, stars: item.stars });
+    categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], readmeSearches: mode === 'topic' ? readmeSearches : [], readmeStats, searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, minStars, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, periods: Object.fromEntries(positive.map(days => [String(days), staleIds.has(item.id.toLowerCase()) ? null : delta(snapshots,item.id,days,date)])) })) });
   }
   snapshots = snapshots.filter(row => row.date >= daysAgo(date, maxDays + 5));
   await mkdir(dirname(output), { recursive: true });
