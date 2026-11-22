@@ -28,6 +28,13 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
   const MAX_README_CHECKS = 12;
   const MAX_PREVIOUS_REFRESHES = 24;
   let previousRefreshes = 0;
+  let lastSearchAt = 0;
+  const throttleSearch = async () => {
+    if (fetchImpl !== fetch) return; // unit tests use a mock transport
+    const wait = Math.max(0, 2200 - (Date.now() - lastSearchAt));
+    if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+    lastSearchAt = Date.now();
+  };
   const fetchRepo = async (id, headers) => {
     const key = id.toLowerCase();
     if (!repoCache.has(key)) repoCache.set(key, (async () => {
@@ -68,6 +75,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const staleIds = new Set();
     for (const query of queries) {
       const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query + (minStars ? ` stars:>=${minStars}` : ''))}&sort=stars&order=desc&per_page=${limit}`;
+      await throttleSearch();
       const result = await request(url);
       for (const repo of result.items || []) {
         if (!repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
@@ -77,6 +85,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     // as the requested type near the beginning of its README.
     const readmeStats = { candidates: 0, accepted: 0 };
     for (const phrase of mode === 'topic' ? readmeSearches : []) {
+      await throttleSearch();
       const result = await request(`https://api.github.com/search/repositories?q=${encodeURIComponent(phrase + ' in:readme' + (minStars ? ` stars:>=${minStars}` : ''))}&sort=stars&order=desc&per_page=${limit}`);
       for (const repo of result.items || []) {
         if (repo.archived || repo.fork || merged.has(repo.full_name.toLowerCase())) continue;
