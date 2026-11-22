@@ -150,3 +150,22 @@ test('collects optional GitHub repository metadata without extra requests', asyn
   assert.equal(item.homepage,'https://example.org');
   assert.equal(calls,1);
 });
+
+test('minimum Stars filters both search and retained candidates', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ecosystems:[{id:'test',name:'Test',source:'github',topic:'terminal-tool',limit:100,min_stars:100}]}));
+  const urls = [];
+  const fetchImpl = async url => {
+    urls.push(url);
+    return {ok:true,json:async()=>({items:[
+      {full_name:'owner/popular',name:'popular',html_url:'https://github.com/owner/popular',stargazers_count:120},
+      {full_name:'owner/small',name:'small',html_url:'https://github.com/owner/small',stargazers_count:12}
+    ]})};
+  };
+  await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
+  const category=JSON.parse(await readFile(output,'utf8')).categories[0];
+  assert.deepEqual(category.items.map(item=>item.id),['owner/popular']);
+  assert.equal(category.minStars,100);
+  assert.ok(urls.some(url=>decodeURIComponent(url).includes('stars:>=100')));
+});
