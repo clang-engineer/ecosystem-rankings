@@ -23,6 +23,21 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
   const previous = await readJson(output, { categories: [] });
   const previousByCategory = new Map((previous.categories || []).map(category => [category.id, category.items || []]));
   const categories = [];
+  const repoCache = new Map();
+  const readmeCache = new Map();
+  const MAX_README_CHECKS = 12;
+  const MAX_PREVIOUS_REFRESHES = 24;
+  let previousRefreshes = 0;
+  const fetchRepo = async (id, headers) => {
+    const key = id.toLowerCase();
+    if (!repoCache.has(key)) repoCache.set(key, (async () => {
+      const response = await fetchImpl('https://api.github.com/repos/' + id.split('/').map(encodeURIComponent).join('/'), { headers });
+      if (response.status === 404 || response.status === 410) return null;
+      if (!response.ok) throw Error('GitHub API ' + response.status + ' refreshing ' + id + ': ' + (await response.text()).slice(0,180));
+      return response.json();
+    })());
+    return repoCache.get(key);
+  };
   for (const category of settings.ecosystems) {
     if (category.source !== 'github' || (category.topic && !/^[a-z0-9-]+$/i.test(category.topic))) throw Error(`Unsupported source or topic: ${category.id}`);
     const repositories = category.repositories ?? [];
@@ -48,6 +63,8 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const normalize = repo => ({ id: repo.full_name, name: repo.name, description: repo.description || '', url: repo.html_url, stars: repo.stargazers_count, forks: repo.forks_count ?? null, createdAt: repo.created_at ?? null, pushedAt: repo.pushed_at ?? null, updatedAt: repo.updated_at ?? null, language: repo.language ?? null, license: repo.license?.spdx_id && repo.license.spdx_id !== 'NOASSERTION' ? repo.license.spdx_id : null, topics: repo.topics ?? [], homepage: repo.homepage || null });
     const queries = mode === 'topic' ? [...(category.topic ? [`topic:${category.topic}`] : []), ...searches] : [];
     const merged = new Map();
+    const previousItems = previousByCategory.get(category.id) || [];
+    let readmeChecks = 0;
     for (const query of queries) {
       const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query + (minStars ? ` stars:>=${minStars}` : ''))}&sort=stars&order=desc&per_page=${limit}`;
       const result = await request(url);
@@ -63,10 +80,16 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       for (const repo of result.items || []) {
         if (repo.archived || repo.fork || merged.has(repo.full_name.toLowerCase())) continue;
         readmeStats.candidates++;
-        const response = await fetchImpl('https://api.github.com/repos/' + repo.full_name.split('/').map(encodeURIComponent).join('/') + '/readme', { headers: { ...headers, Accept: 'application/vnd.github.raw+json' } });
-        if (response.status === 404) continue;
-        if (!response.ok) throw Error('GitHub README API ' + response.status + ': ' + (await response.text()).slice(0,180));
-        const intro = (await response.text()).slice(0, 1800).toLowerCase();
+        if (readmeChecks >= MAX_README_CHECKS) break;
+        readmeChecks++;
+        const key = repo.full_name.toLowerCase();
+        if (!readmeCache.has(key)) readmeCache.set(key, (async () => {
+          const response = await fetchImpl('https://api.github.com/repos/' + repo.full_name.split('/').map(encodeURIComponent).join('/') + '/readme', { headers: { ...headers, Accept: 'application/vnd.github.raw+json' } });
+          if (response.status === 404) return '';
+          if (!response.ok) throw Error('GitHub README API ' + response.status + ': ' + (await response.text()).slice(0,180));
+          return (await response.text()).slice(0, 1800).toLowerCase();
+        })());
+        const intro = await readmeCache.get(key);
         const expected = phrase.toLowerCase().trim();
         // A mention in a long list of alternatives is not enough. Restrict
         // admission to a self-description near the start of the README.
@@ -81,25 +104,25 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     for (const name of repositories) {
       const key = name.toLowerCase();
       if (!merged.has(key)) {
-        const repo = await request(`https://api.github.com/repos/${name.split('/').map(encodeURIComponent).join('/')}`);
-        merged.set(repo.full_name.toLowerCase(), normalize(repo));
+        const repo = await fetchRepo(name, headers);
+        if (repo && !repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
       }
     }
     // Keep previously discovered repositories even when they fall out of search results.
     // Refresh live Stars instead of copying stale values from the previous output.
     if (mode === 'topic') {
-      const previousItems = previousByCategory.get(category.id) || [];
       const excluded = new Set(exclude.map(name => name.toLowerCase()));
       const missing = previousItems.filter(item => item.id && !merged.has(item.id.toLowerCase()) && !excluded.has(item.id.toLowerCase()));
-      for (let start = 0; start < missing.length; start += 8) {
-        const batch = missing.slice(start, start + 8);
-        const refreshed = await Promise.all(batch.map(async item => {
-          const response = await fetchImpl('https://api.github.com/repos/' + item.id.split('/').map(encodeURIComponent).join('/'), { headers });
-          if (response.status === 404 || response.status === 410) return null;
-          if (!response.ok) throw Error('GitHub API ' + response.status + ' refreshing ' + item.id + ': ' + (await response.text()).slice(0, 180));
-          return response.json();
-        }));
-        for (const repo of refreshed) if (repo && !repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
+      for (const item of missing) {
+        // Retain known repositories without issuing hundreds of individual API calls.
+        // Their Stars remain at the last observed value until refreshed by search or a later run.
+        if (previousRefreshes >= MAX_PREVIOUS_REFRESHES) {
+          merged.set(item.id.toLowerCase(), { ...item });
+          continue;
+        }
+        previousRefreshes++;
+        const repo = await fetchRepo(item.id, headers);
+        if (repo && !repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
       }
     }
     for (const name of exclude) merged.delete(name.toLowerCase());
