@@ -35,10 +35,32 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     if (wait) await new Promise(resolve => setTimeout(resolve, wait));
     lastSearchAt = Date.now();
   };
+  const fetchWithRateLimitRetry = async (url, options) => {
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetchImpl(url, options);
+      if (attempt === 2 || ![403, 429].includes(response.status)) return response;
+
+      const headers = response.headers;
+      const exhausted = headers?.get('x-ratelimit-remaining') === '0';
+      const retryAfter = headers?.get('retry-after');
+      const body = await response.clone().text();
+      if (response.status !== 429 && !exhausted && retryAfter == null && !/rate limit exceeded/i.test(body)) return response;
+
+      const reset = Number(headers?.get('x-ratelimit-reset'));
+      const delay = retryAfter != null && /^\d+$/.test(retryAfter)
+        ? Number(retryAfter) * 1000
+        : exhausted && reset > 0
+          ? Math.max(0, reset * 1000 - Date.now())
+          : 60000 * (attempt + 1);
+      if (delay > 120000) return response;
+      await response.body?.cancel();
+      await new Promise(resolve => setTimeout(resolve, delay + 1000));
+    }
+  };
   const fetchRepo = async (id, headers) => {
     const key = id.toLowerCase();
     if (!repoCache.has(key)) repoCache.set(key, (async () => {
-      const response = await fetchImpl('https://api.github.com/repos/' + id.split('/').map(encodeURIComponent).join('/'), { headers });
+      const response = await fetchWithRateLimitRetry('https://api.github.com/repos/' + id.split('/').map(encodeURIComponent).join('/'), { headers });
       if (response.status === 404 || response.status === 410) return null;
       if (!response.ok) throw Error('GitHub API ' + response.status + ' refreshing ' + id + ': ' + (await response.text()).slice(0,180));
       return response.json();
@@ -63,7 +85,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     if (!Array.isArray(readmeSearches) || readmeSearches.length > 3 || readmeSearches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150 || /\bin:/.test(q))) throw Error('Invalid readme_searches');
     const headers = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ecosystem-rankings', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
     const request = async url => {
-      const response = await fetchImpl(url, { headers });
+      const response = await fetchWithRateLimitRetry(url, { headers });
       if (!response.ok) throw Error(`GitHub API ${response.status}: ${(await response.text()).slice(0,180)}`);
       return response.json();
     };
@@ -94,7 +116,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
         readmeChecks++;
         const key = repo.full_name.toLowerCase();
         if (!readmeCache.has(key)) readmeCache.set(key, (async () => {
-          const response = await fetchImpl('https://api.github.com/repos/' + repo.full_name.split('/').map(encodeURIComponent).join('/') + '/readme', { headers: { ...headers, Accept: 'application/vnd.github.raw+json' } });
+          const response = await fetchWithRateLimitRetry('https://api.github.com/repos/' + repo.full_name.split('/').map(encodeURIComponent).join('/') + '/readme', { headers: { ...headers, Accept: 'application/vnd.github.raw+json' } });
           if (response.status === 404) return '';
           if (!response.ok) throw Error('GitHub README API ' + response.status + ': ' + (await response.text()).slice(0,180));
           return (await response.text()).slice(0, 1800).toLowerCase();
