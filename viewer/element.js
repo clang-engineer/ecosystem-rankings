@@ -24,9 +24,36 @@ const groupedOptions = (categories, selected) => {
   if (others.length) sections.push(`<optgroup label="기타 분야">${others.map(option).join('')}</optgroup>`);
   return sections.join('');
 };
+const loadingMarkup = () => {
+  const rows = Array.from({ length: 6 }, () => '<div class="er-skeleton-row" aria-hidden="true"><span class="er-skeleton er-skeleton-rank"></span><div class="er-skeleton-info"><span class="er-skeleton er-skeleton-name"></span><span class="er-skeleton er-skeleton-description"></span><span class="er-skeleton er-skeleton-facts"></span></div><span class="er-skeleton er-skeleton-score"></span></div>');
+  return [
+    '<style>',
+    'ecosystem-rankings .er-loading { display:block; border:1px solid var(--main-border-color,#dce0e5); border-radius:14px; overflow:hidden; background:var(--card-bg,transparent); }',
+    'ecosystem-rankings .er-loading-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; padding:1rem 1.15rem; border-bottom:1px solid var(--main-border-color,#dce0e5); }',
+    'ecosystem-rankings .er-loading-controls { display:flex; gap:.55rem; }',
+    'ecosystem-rankings .er-skeleton { display:block; border-radius:6px; background:linear-gradient(90deg,rgba(127,127,127,.12) 25%,rgba(127,127,127,.23) 50%,rgba(127,127,127,.12) 75%); background-size:200% 100%; animation:er-shimmer 1.35s ease-in-out infinite; }',
+    'ecosystem-rankings .er-skeleton-title { width:12rem; height:1.15rem; }',
+    'ecosystem-rankings .er-skeleton-select { width:7.5rem; height:2rem; border:1px solid rgba(127,127,127,.12); }',
+    'ecosystem-rankings .er-skeleton-meta { height:2.3rem; padding:.6rem 1.15rem; border-bottom:1px solid var(--main-border-color,#dce0e5); }',
+    'ecosystem-rankings .er-skeleton-meta::before { content:""; display:block; width:12rem; height:.7rem; border-radius:6px; background:rgba(127,127,127,.14); }',
+    'ecosystem-rankings .er-skeleton-row { display:flex; align-items:center; gap:.9rem; padding:.9rem 1.15rem; border-bottom:1px solid var(--main-border-color,#dce0e5); }',
+    'ecosystem-rankings .er-skeleton-row:last-child { border-bottom:0; }',
+    'ecosystem-rankings .er-skeleton-rank { flex:0 0 2rem; height:.85rem; }',
+    'ecosystem-rankings .er-skeleton-info { flex:1; min-width:0; display:grid; gap:.38rem; }',
+    'ecosystem-rankings .er-skeleton-name { width:min(13rem,70%); height:.85rem; }',
+    'ecosystem-rankings .er-skeleton-description { width:85%; height:.6rem; }',
+    'ecosystem-rankings .er-skeleton-facts { width:35%; height:.5rem; }',
+    'ecosystem-rankings .er-skeleton-score { flex:0 0 5rem; height:.85rem; }',
+    '@keyframes er-shimmer { to { background-position:-200% 0; } }',
+    '@media(max-width:640px) { ecosystem-rankings .er-loading-toolbar { align-items:stretch; } ecosystem-rankings .er-loading-controls { width:100%; } ecosystem-rankings .er-skeleton-title { width:9rem; } ecosystem-rankings .er-skeleton-select { width:50%; } ecosystem-rankings .er-skeleton-row { padding:.8rem; gap:.55rem; } ecosystem-rankings .er-skeleton-rank { flex-basis:1.5rem; } }',
+    '@media(prefers-reduced-motion:reduce) { ecosystem-rankings .er-skeleton { animation:none; } }',
+    '</style>',
+    '<div class="er-loading" role="status" aria-live="polite"><span class="visually-hidden">랭킹 데이터를 불러오는 중입니다.</span><div class="er-loading-toolbar" aria-hidden="true"><span class="er-skeleton er-skeleton-title"></span><div class="er-loading-controls"><span class="er-skeleton er-skeleton-select"></span><span class="er-skeleton er-skeleton-select"></span></div></div><div class="er-skeleton-meta" aria-hidden="true"></div><div class="er-loading-list" aria-hidden="true">' + rows.join('') + '</div></div>'
+  ].join('');
+};
 class EcosystemRankings extends HTMLElement {
   connectedCallback() {
-    this.innerHTML = '<p role="status">랭킹 데이터를 불러오는 중…</p>';
+    this.innerHTML = loadingMarkup();
     this.load();
   }
   async load() {
