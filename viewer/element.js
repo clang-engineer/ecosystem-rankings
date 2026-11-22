@@ -4,6 +4,26 @@ const shortDate = value => { if (!value) return null; const d = new Date(value);
 const recentPush = value => { if (!value) return null; const diff = Date.now() - new Date(value).getTime(); if (!Number.isFinite(diff)) return null; const days = Math.max(0, Math.floor(diff / 86400000)); return days === 0 ? '오늘 Push' : days < 30 ? days + '일 전 Push' : days < 365 ? Math.floor(days / 30) + '개월 전 Push' : Math.floor(days / 365) + '년 전 Push'; };
 const compact = value => Number(value).toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 1 });
 const categoryLabel = category => category?.id === 'tmux-plugins' ? 'Tmux Plugins' : category?.name ?? '';
+const categoryGroups = [
+  ['터미널·셸 환경', ['terminal-emulators', 'shell-environments', 'shell-prompts', 'terminal-multiplexers']],
+  ['개발·탐색 도구', ['terminal-editors', 'terminal-file-managers', 'cli-search-tools', 'git-tui', 'cli-database-clients']],
+  ['시스템·운영 환경', ['window-managers', 'terminal-system-monitors', 'container-tui']],
+  ['AI 개발 생태계', ['ai-coding-agents', 'ai-agent-ecosystem']],
+  ['플러그인 생태계', ['neovim-plugins', 'tmux-plugins']]
+];
+const groupedOptions = (categories, selected) => {
+  const byId = new Map(categories.map(c => [c.id, c]));
+  const seen = new Set();
+  const option = c => `<option value="${escape(c.id)}" ${c.id === selected ? 'selected' : ''}>${escape(categoryLabel(c))}</option>`;
+  const sections = categoryGroups.map(([label, ids]) => {
+    const matches = ids.map(id => byId.get(id)).filter(Boolean);
+    matches.forEach(c => seen.add(c.id));
+    return matches.length ? `<optgroup label="${escape(label)}">${matches.map(option).join('')}</optgroup>` : '';
+  });
+  const others = categories.filter(c => !seen.has(c.id));
+  if (others.length) sections.push(`<optgroup label="기타 분야">${others.map(option).join('')}</optgroup>`);
+  return sections.join('');
+};
 class EcosystemRankings extends HTMLElement {
   connectedCallback() {
     this.innerHTML = '<p role="status">랭킹 데이터를 불러오는 중…</p>';
@@ -69,7 +89,7 @@ class EcosystemRankings extends HTMLElement {
       ecosystem-rankings .er-empty { padding:2.5rem 1rem; text-align:center; color:var(--er-muted); }
       ecosystem-rankings .er-criteria { position:relative; font-size:.75rem; color:var(--er-muted); }\n      ecosystem-rankings .er-criteria summary { cursor:pointer; width:max-content; font-weight:600; color:var(--text-color,inherit); }\n      ecosystem-rankings .er-criteria-body { position:absolute; z-index:10; right:0; top:calc(100% + .45rem); width:min(28rem,80vw); max-height:65vh; overflow:auto; background:var(--card-bg,var(--main-bg,#fff)); color:var(--text-color,inherit); border:1px solid var(--er-border); border-radius:8px; box-shadow:0 5px 18px rgba(0,0,0,.12); padding:.75rem 1rem; line-height:1.8; overflow-wrap:anywhere; }\n      ecosystem-rankings .er-criteria-body strong { margin-right:.5rem; }\n      ecosystem-rankings .er-criteria-body code { font-size:.75rem; white-space:normal; }\n      ecosystem-rankings .er-criteria-body p { margin:.4rem 0 0; }\n      ecosystem-rankings .er-footer { display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding:.7rem 1.15rem; border-top:1px solid var(--er-border); font-size:.73rem; color:var(--er-muted); }
       @media(max-width:640px) { ecosystem-rankings .er-toolbar { align-items:stretch; } ecosystem-rankings .er-controls { width:100%; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:.5rem; } ecosystem-rankings label { width:100%; min-width:0; gap:.3rem; } ecosystem-rankings select { width:100%; min-width:0; flex:1; } ecosystem-rankings .er-meta { gap:.4rem .7rem; } ecosystem-rankings .er-meta .er-criteria { margin-left:0; } ecosystem-rankings .er-item { padding:.8rem; gap:.55rem; } ecosystem-rankings .er-rank { flex-basis:1.5rem; } }
-    </style><div class="er-shell"><div class="er-toolbar"><div><div class="er-eyebrow">OPEN SOURCE / RANKINGS</div><div class="er-heading">Discover by ecosystem</div></div><div class="er-controls"><label>분야 <select data-category aria-label="랭킹 분야">${categories.map(c => `<option value="${escape(c.id)}" ${c.id === category?.id ? 'selected' : ''}>${escape(categoryLabel(c))}</option>`).join('')}</select></label><label>기간 <select data-period aria-label="랭킹 기간">${(this.data.periods || [0,7,30]).map(id => `<option value="${id}" ${String(id) === this.period ? 'selected' : ''} >${id === 0 ? '전체' : id === 7 ? '주간 (7일)' : id === 30 ? '월간 (30일)' : id === 90 ? '분기 (90일)' : id + '일'}</option>`).join('')}</select></label></div></div><div class="er-meta"><span>${total}개 프로젝트 · ${rankingBasis}</span>${notice}${criteria}</div>${list}<div class="er-footer"><span>GitHub Stars · discovery ranking</span><span>Updated ${escape(this.data.updatedAt ? new Date(this.data.updatedAt).toLocaleDateString("ko-KR") : "—")}</span></div></div>`;
+    </style><div class="er-shell"><div class="er-toolbar"><div><div class="er-eyebrow">OPEN SOURCE / RANKINGS</div><div class="er-heading">Discover by ecosystem</div></div><div class="er-controls"><label>분야 <select data-category aria-label="랭킹 분야">${groupedOptions(categories, category?.id)}</select></label><label>기간 <select data-period aria-label="랭킹 기간">${(this.data.periods || [0,7,30]).map(id => `<option value="${id}" ${String(id) === this.period ? 'selected' : ''} >${id === 0 ? '전체' : id === 7 ? '주간 (7일)' : id === 30 ? '월간 (30일)' : id === 90 ? '분기 (90일)' : id + '일'}</option>`).join('')}</select></label></div></div><div class="er-meta"><span>${total}개 프로젝트 · ${rankingBasis}</span>${notice}${criteria}</div>${list}<div class="er-footer"><span>GitHub Stars · discovery ranking</span><span>Updated ${escape(this.data.updatedAt ? new Date(this.data.updatedAt).toLocaleDateString("ko-KR") : "—")}</span></div></div>`;
     this.querySelector('[data-category]')?.addEventListener('change', event => { this.category = event.target.value; this.render(); });
     this.querySelector('[data-period]')?.addEventListener('change', event => { this.period = event.target.value; this.render(); });
   }
