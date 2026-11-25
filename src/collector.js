@@ -163,10 +163,36 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     for (const item of items) if (!staleIds.has(item.id.toLowerCase())) snapshots = snapshots.filter(row => !(row.id === item.id && row.date === date)).concat({ id: item.id, date, stars: item.stars });
     categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], readmeSearches: mode === 'topic' ? readmeSearches : [], readmeStats, searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, minStars, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, description: Array.from(String(item.description || '').trim()).slice(0, 500).join(''), periods: Object.fromEntries(positive.map(days => [String(days), staleIds.has(item.id.toLowerCase()) ? null : delta(snapshots,item.id,days,date)])) })) });
   }
+  // Owner metadata is shared across categories and refreshed weekly.
+  const owners = {};
+  const ownerNames = new Map();
+  for (const category of categories) for (const item of category.items) {
+    const login = item.id.split('/')[0];
+    ownerNames.set(login.toLowerCase(), login);
+  }
+  const ownerHeaders = { Accept: 'application/vnd.github+json', 'User-Agent': 'ecosystem-rankings', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  let ownerRequests = 0;
+  for (const [key, login] of ownerNames) {
+    const cached = previous.owners?.[key];
+    if (cached) owners[key] = cached;
+    if (cached?.fetchedAt && cached.fetchedAt >= daysAgo(date, 7)) continue;
+    // Bound extra API traffic; uncached owners are picked up on subsequent runs.
+    if (ownerRequests >= 100) continue;
+    ownerRequests++;
+    try {
+      const response = await fetchWithRateLimitRetry('https://api.github.com/users/' + encodeURIComponent(login), { headers: ownerHeaders });
+      if (!response.ok) continue;
+      const profile = await response.json();
+      if (!profile.login) continue;
+      owners[key] = { login: profile.login, name: profile.name ?? null, type: profile.type ?? null, followers: profile.followers ?? null, publicRepos: profile.public_repos ?? null, createdAt: profile.created_at ?? null, fetchedAt: now.toISOString() };
+    } catch (error) {
+      console.warn('Owner metadata unavailable for ' + login + ': ' + error.message);
+    }
+  }
   snapshots = snapshots.filter(row => row.date >= daysAgo(date, maxDays + 5));
   await mkdir(dirname(output), { recursive: true });
   await mkdir(dirname(history), { recursive: true });
   await writeFile(history, JSON.stringify(snapshots,null,2)+'\n');
-  await writeFile(output, JSON.stringify({ updatedAt: now.toISOString(), periods, defaultPeriod, categories },null,2)+'\n');
+  await writeFile(output, JSON.stringify({ updatedAt: now.toISOString(), periods, defaultPeriod, categories, owners },null,2)+'\n');
   console.log(`Collected ${categories.length} categories into ${output}`);
 }
