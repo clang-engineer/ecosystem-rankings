@@ -172,10 +172,14 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
   }
   const ownerHeaders = { Accept: 'application/vnd.github+json', 'User-Agent': 'ecosystem-rankings', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   let ownerRequests = 0;
-  for (const [key, login] of ownerNames) {
+  const ownerQueue = [...ownerNames].sort(([a], [b]) => {
+    const age = key => previous.owners?.[key]?.fetchedAt || '';
+    return age(a).localeCompare(age(b));
+  });
+  for (const [key, login] of ownerQueue) {
     const cached = previous.owners?.[key];
     if (cached) owners[key] = cached;
-    if (cached?.fetchedAt && cached.fetchedAt >= daysAgo(date, 7)) continue;
+    if (cached?.fetchedAt && cached.fetchedAt >= daysAgo(date, 7) && Array.isArray(cached.projects)) continue;
     // Bound extra API traffic; uncached owners are picked up on subsequent runs.
     if (ownerRequests >= 100) continue;
     ownerRequests++;
@@ -184,7 +188,20 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       if (!response.ok) continue;
       const profile = await response.json();
       if (!profile.login) continue;
-      owners[key] = { login: profile.login, name: profile.name ?? null, type: profile.type ?? null, followers: profile.followers ?? null, publicRepos: profile.public_repos ?? null, createdAt: profile.created_at ?? null, fetchedAt: now.toISOString() };
+      owners[key] = { ...cached, login: profile.login, name: profile.name ?? null, type: profile.type ?? null, followers: profile.followers ?? null, publicRepos: profile.public_repos ?? null, createdAt: profile.created_at ?? null, fetchedAt: now.toISOString() };
+      // Search public repositories by owner and Stars; exclude forks and archives.
+      // This is a bounded sample of popular projects, not a contribution history.
+      try {
+        await throttleSearch();
+        const query = (profile.type === 'Organization' ? 'org:' : 'user:') + profile.login + ' fork:false archived:false';
+        const result = await fetchWithRateLimitRetry('https://api.github.com/search/repositories?q=' + encodeURIComponent(query) + '&sort=stars&order=desc&per_page=6', { headers: ownerHeaders });
+        if (result.ok) {
+          const data = await result.json();
+          owners[key].projects = (data.items || []).filter(repo => !repo.fork && !repo.archived && repo.stargazers_count > 0).slice(0, 6).map(repo => ({ id: repo.full_name, stars: repo.stargazers_count }));
+        }
+      } catch (error) {
+        console.warn('Owner projects unavailable for ' + login + ': ' + error.message);
+      }
     } catch (error) {
       console.warn('Owner metadata unavailable for ' + login + ': ' + error.message);
     }
