@@ -79,7 +79,9 @@ class EcosystemRankings extends HTMLElement {
       const owner = this.data.owners?.[item.id.split('/')[0].toLowerCase()];
       if (!owner) return '';
       const facts = [owner.type === 'Organization' ? '조직' : owner.type === 'User' ? '개인' : null, Number.isFinite(owner.publicRepos) ? '공개 저장소 ' + number(owner.publicRepos) : null, shortDate(owner.createdAt) ? '가입 ' + shortDate(owner.createdAt) : null].filter(Boolean).join(' · ');
-      return `<details class="er-owner"><summary>Owner${Number.isFinite(owner.followers) ? ' · ' + number(owner.followers) + ' followers' : ''}</summary><a href="https://github.com/${encodeURIComponent(owner.login)}" target="_blank" rel="noopener noreferrer">${escape(owner.name || owner.login)} (@${escape(owner.login)})</a><div>${escape(facts)}</div></details>`;
+      const projects = (owner.projects || []).filter(project => project.id.toLowerCase() !== item.id.toLowerCase()).slice(0, 3);
+      const other = projects.length ? '<div>다른 인기 저장소</div><ul>' + projects.map(project => '<li><a href="https://github.com/' + project.id.split('/').map(encodeURIComponent).join('/') + '" target="_blank" rel="noopener noreferrer">' + escape(project.id.split('/')[1]) + '</a> · ' + number(project.stars) + ' ★</li>').join('') + '</ul>' : '';
+      return `<details class="er-owner"><summary>Owner${Number.isFinite(owner.followers) ? ' · ' + number(owner.followers) + ' followers' : ''}</summary><a href="https://github.com/${encodeURIComponent(owner.login)}" target="_blank" rel="noopener noreferrer">${escape(owner.name || owner.login)} (@${escape(owner.login)})</a><div>${escape(facts)}</div>${other}</details>`;
     };
     const category = categories.find(c => c.id === this.category) || categories[0];
     const value = item => this.period === '0' ? item.stars : item.periods?.[this.period];
