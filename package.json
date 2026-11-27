@@ -16,7 +16,8 @@
     "templates"
   ],
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "prepublishOnly": "npm test"
   },
   "engines": {
     "node": ">=20"
@@ -24,5 +25,25 @@
   "license": "MIT",
   "dependencies": {
     "yaml": "^2.8.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clang-engineer/ecosystem-rankings.git"
+  },
+  "homepage": "https://github.com/clang-engineer/ecosystem-rankings#readme",
+  "bugs": {
+    "url": "https://github.com/clang-engineer/ecosystem-rankings/issues"
+  },
+  "keywords": [
+    "github",
+    "rankings",
+    "developer-tools",
+    "github-stars",
+    "web-component",
+    "github-actions",
+    "ecosystem"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
