@@ -1,6 +1,13 @@
 # ecosystem-rankings
 
-Configurable rankings for developer tools and plugin ecosystems.
+Build your own developer-tool rankings with a configurable GitHub collector,
+historical Stars snapshots, and an embeddable Web Component.
+
+**[Explore the live Radar example](https://clang-engineer.github.io/radar/)**
+
+- Discover repositories by topic, search query, or curated list.
+- Compare cumulative Stars and growth over configurable periods.
+- Publish rankings on your own site using GitHub Actions.
 
 **Early preview:** GitHub Topic and repository keyword discovery; not yet published to npm.
 
@@ -22,7 +29,9 @@ The viewer reads the generated JSON. For an existing Jekyll site, place the mark
 <script type="module" src="https://cdn.jsdelivr.net/gh/clang-engineer/ecosystem-rankings@main/viewer/element.js"></script>
 ```
 
-Set the initial Viewer period in `ecosystems.yml`: `viewer.default_period: 7`. The collector includes this setting in the generated JSON; the Viewer reads it automatically. `0` means cumulative all-time Stars. Users can change periods in the Viewer. Period rankings appear only after sufficient history has accumulated.\n\nFor production, pin the Action and CDN URL to a release or commit SHA.
+Set the initial Viewer period in `ecosystems.yml`: `viewer.default_period: 7`. The collector includes this setting in the generated JSON; the Viewer reads it automatically. `0` means cumulative all-time Stars. Users can change periods in the Viewer. Period rankings appear only after sufficient history has accumulated.
+
+For production, pin the Action and CDN URL to a release or commit SHA.
 
 ## Ranking semantics
 
