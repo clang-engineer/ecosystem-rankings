@@ -24,6 +24,7 @@ test('merges explicit repositories, deduplicates topic results, and sorts by sta
   const requests = [];
   const makeRepo = (name, stars) => ({ full_name: name, name: name.split('/')[1], html_url: 'https://github.com/'+name, description: '', stargazers_count: stars });
   const fetchImpl = async url => {
+    if (url.includes('/users/')) return { ok: false };
     requests.push(url);
     const body = url.includes('/search/repositories') ? { items: [makeRepo('owner/existing', 5)] } : makeRepo('owner/popular', 100);
     return { ok: true, json: async () => body };
@@ -52,6 +53,7 @@ test('curated mode skips topic search and exclude removes configured repositorie
   await writeFile(config, JSON.stringify({ ecosystems: [{ id: 'test', name: 'Test', source: 'github', discovery: 'curated', topic: 'some-topic', repositories: ['owner/keep', 'owner/drop'], exclude: ['OWNER/DROP'] }] }));
   const requests = [];
   const fetchImpl = async url => {
+    if (url.includes('/users/')) return { ok: false };
     requests.push(url);
     const name = url.split('/repos/')[1];
     return { ok:true, json:async()=>({full_name:name,name:name.split('/')[1],description:'',html_url:'https://github.com/'+name,stargazers_count:10}) };
@@ -71,6 +73,7 @@ test('automatic discovery combines topic and search queries without duplicates',
   const requests = [];
   const repo = (name, stars) => ({ full_name:name, name:name.split('/')[1], description:'', html_url:'https://github.com/'+name, stargazers_count:stars });
   const fetchImpl = async url => {
+    if (url.includes('/users/')) return { ok: false };
     requests.push(url);
     const data = url.includes('topic%3Atmux-plugin') ? {items:[repo('owner/topic',20),repo('owner/unrelated',99)]}
       : url.includes('/search/repositories') ? {items:[repo('owner/topic',20),repo('owner/discovered',30)]}
@@ -95,6 +98,7 @@ test('retains a previously discovered repository when it falls out of search res
   await writeFile(history, JSON.stringify([{id:'owner/old',date:'2026-11-14',stars:10}]));
   const requests = [];
   const fetchImpl = async url => {
+    if (url.includes('/users/')) return { ok: false };
     requests.push(url);
     return { ok:true, json:async()=>url.includes('/search/') ? {items:[repo('owner/new',30)]} : repo('owner/old',15) };
   };
@@ -121,14 +125,14 @@ test('README candidates are not rejected by global keyword blacklists', async ()
   await writeFile(config,JSON.stringify({ecosystems:[{id:'mux',name:'Multiplexers',source:'github',topic:'terminal-multiplexer',readme_searches:['terminal multiplexer'],limit:10}]}));
   const repo=id=>({full_name:id,name:id.split('/')[1],html_url:'https://github.com/'+id,description:'',stargazers_count:20});
   const fetchImpl=async url=>{
-    if(url.includes('/search/') && url.includes('in%3Areadme'))return {ok:true,json:async()=>({items:[repo('org/tool'),repo('org/plugin'),repo('org/list')]})};
+    if(url.includes('/search/') && new URL(url).searchParams.get('q').includes('in:readme'))return {ok:true,json:async()=>({items:[repo('org/tool'),repo('org/plugin'),repo('org/list')]})};
     if(url.includes('/search/'))return {ok:true,json:async()=>({items:[]})};
-    const readme=url.includes('org/tool')?'# Tool\\nTool is a terminal multiplexer for interactive sessions.':url.includes('org/plugin')?'# Plugin\\nA terminal multiplexer plugin for status lines.':'# List\\nA list of useful command-line tools including a terminal multiplexer.';
+    const readme=url.includes('org/tool')?'# Tool\nTool is a terminal multiplexer for interactive sessions.':url.includes('org/plugin')?'# Plugin\nA terminal multiplexer plugin for status lines.':'# List\nA list of useful command-line tools including a terminal multiplexer.';
     return {ok:true,text:async()=>readme};
   };
   await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
   const data=JSON.parse(await readFile(output,'utf8'));
-  assert.deepEqual(data.categories[0].items.map(x=>x.id),['org/tool','org/plugin','org/list']);
+  assert.deepEqual(data.categories[0].items.map(x=>x.id),['org/list','org/plugin','org/tool']);
   assert.equal(data.categories[0].readmeStats.candidates,3);
   assert.equal(data.categories[0].readmeStats.accepted,3);
 });
@@ -138,7 +142,17 @@ test('collects optional GitHub repository metadata without extra requests', asyn
   const config=join(dir,'ecosystems.json'),output=join(dir,'rankings.json'),history=join(dir,'history.json');
   await writeFile(config,JSON.stringify({ecosystems:[{id:'tools',name:'Tools',source:'github',topic:'terminal-tool'}]}));
   let calls=0;
-  const fetchImpl=async()=>{calls++;return {ok:true,json:async()=>({items:[{full_name:'owner/tool',name:'tool',html_url:'https://github.com/owner/tool',stargazers_count:42,forks_count:8,created_at:'2020-01-01T00:00:00Z',pushed_at:'2026-11-20T00:00:00Z',updated_at:'2026-11-20T00:00:00Z',language:'Rust',license:{spdx_id:'MIT'},topics:['terminal-tool'],homepage:'https://example.org'}]})}}};
+  const fetchImpl = async url => {
+    if (url.includes('/users/')) return { ok: false };
+    calls++;
+    return { ok: true, json: async () => ({ items: [{
+      full_name: 'owner/tool', name: 'tool', html_url: 'https://github.com/owner/tool',
+      stargazers_count: 42, forks_count: 8, created_at: '2020-01-01T00:00:00Z',
+      pushed_at: '2026-11-20T00:00:00Z', updated_at: '2026-11-21T00:00:00Z',
+      language: 'Rust', license: { spdx_id: 'MIT' }, topics: ['terminal-tool'],
+      homepage: 'https://example.org'
+    }] }) };
+  };
   await collect({config,output,history,fetchImpl,now:new Date('2026-11-21T00:00:00Z')});
   const item=JSON.parse(await readFile(output,'utf8')).categories[0].items[0];
   assert.equal(item.forks,8);
@@ -168,4 +182,36 @@ test('minimum Stars filters both search and retained candidates', async () => {
   assert.deepEqual(category.items.map(item=>item.id),['owner/popular']);
   assert.equal(category.minStars,100);
   assert.ok(urls.some(url=>decodeURIComponent(url).includes('stars:>=100')));
+});
+
+test('metadata exclusions filter search, explicit and retained repositories before recording snapshots', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ ecosystems: [{
+    id: 'themes', name: 'Themes', source: 'github', topic: 'theme',
+    repositories: ['owner/awesome-themes'], exclude_patterns: ['^awesome-', '\\btheme generator\\b']
+  }] }));
+  const repo = (name, description) => ({
+    full_name: 'owner/' + name, name, description, stargazers_count: 500
+  });
+  await writeFile(output, JSON.stringify({ categories: [{ id: 'themes', items: [{ id: 'owner/old-tool' }] }] }));
+  const fetchImpl = async url => {
+    const data = url.includes('/search/')
+      ? { items: [repo('theme', 'A color theme'), repo('tool', 'A Theme Generator')] }
+      : url.endsWith('/old-tool') ? repo('old-tool', 'A theme generator') : repo('awesome-themes', '');
+    return { ok: true, json: async () => data };
+  };
+  await collect({ config, output, history, fetchImpl });
+  const data = JSON.parse(await readFile(output, 'utf8'));
+  assert.deepEqual(data.categories[0].items.map(item => item.id), ['owner/theme']);
+  assert.deepEqual(JSON.parse(await readFile(history, 'utf8')).map(row => row.id), ['owner/theme']);
+});
+
+test('rejects invalid metadata exclusion patterns before searching', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ ecosystems: [{
+    id: 'themes', name: 'Themes', source: 'github', topic: 'theme', exclude_patterns: ['[']
+  }] }));
+  await assert.rejects(collect({ config, output, history, fetchImpl: () => assert.fail('unexpected request') }), /Invalid exclude_patterns for themes/);
 });

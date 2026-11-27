@@ -71,9 +71,19 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     if (category.source !== 'github' || (category.topic && !/^[a-z0-9-]+$/i.test(category.topic))) throw Error(`Unsupported source or topic: ${category.id}`);
     const repositories = category.repositories ?? [];
     const exclude = category.exclude ?? [];
+    const excludePatterns = category.exclude_patterns ?? [];
     const mode = category.discovery ?? (category.topic || category.searches?.length ? 'topic' : 'curated');
     if (!['topic', 'curated'].includes(mode)) throw Error(`Invalid discovery for ${category.id}`);
     if (!Array.isArray(exclude) || exclude.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid exclude for ${category.id}`);
+    if (!Array.isArray(excludePatterns) || excludePatterns.some(pattern => typeof pattern !== 'string' || !pattern.trim())) throw Error(`Invalid exclude_patterns for ${category.id}`);
+    const patterns = excludePatterns.map(pattern => {
+      try {
+        return new RegExp(pattern, 'iu');
+      } catch (error) {
+        throw Error(`Invalid exclude_patterns for ${category.id}: ${error.message}`);
+      }
+    });
+    const matchesExclusion = item => patterns.some(pattern => pattern.test(item.name || '') || pattern.test(item.description || ''));
     if (!Array.isArray(repositories) || repositories.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid repositories for ${category.id}`);
     if ((mode === 'curated' && repositories.length === 0) || (mode === 'topic' && !category.topic && !(category.searches?.length) && repositories.length === 0)) throw Error(`Provide topic, searches or repositories for ${category.id}`);
     const searches = category.searches ?? [];
@@ -159,7 +169,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
       }
     }
     for (const name of exclude) merged.delete(name.toLowerCase());
-    const items = [...merged.values()].filter(item => Number.isFinite(item.stars) && item.stars >= minStars).sort((a,b) => b.stars - a.stars || a.id.localeCompare(b.id));
+    const items = [...merged.values()].filter(item => Number.isFinite(item.stars) && item.stars >= minStars && !matchesExclusion(item)).sort((a,b) => b.stars - a.stars || a.id.localeCompare(b.id));
     for (const item of items) if (!staleIds.has(item.id.toLowerCase())) snapshots = snapshots.filter(row => !(row.id === item.id && row.date === date)).concat({ id: item.id, date, stars: item.stars });
     categories.push({ id: category.id, name: category.name, source: 'github', topic: category.topic || null, searches: mode === 'topic' ? searches : [], readmeSearches: mode === 'topic' ? readmeSearches : [], readmeStats, searchSort: mode === 'topic' ? 'stars' : null, searchLimit: mode === 'topic' ? limit : null, minStars, discovery: mode, metric: 'stars', items: items.map(item => ({ ...item, description: Array.from(String(item.description || '').trim()).slice(0, 500).join(''), periods: Object.fromEntries(positive.map(days => [String(days), staleIds.has(item.id.toLowerCase()) ? null : delta(snapshots,item.id,days,date)])) })) });
   }
