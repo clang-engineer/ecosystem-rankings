@@ -15,12 +15,16 @@ Discover GitHub repositories, track Stars over time, and embed rankings on your 
 
 ## Quick start
 
+Requires Node.js 20 or newer. Run these commands in your existing site repository.
+
 ```sh
 npm install --save-dev github:clang-engineer/ecosystem-rankings
 npx ecosystem-rankings init
 # edit ecosystems.yml
 GITHUB_TOKEN=... npx ecosystem-rankings collect
 ```
+
+The init command creates the configuration and workflow without overwriting existing files. Commit the configuration, enable Actions with repository write permissions, and run the Update Ecosystem Rankings workflow. The consumer repository owns its configuration and generated data.
 
 Embed the generated rankings:
 
@@ -61,6 +65,12 @@ ecosystems:
 The collector writes `periods` and `defaultPeriod` into `rankings.json`; the Viewer requires no separate period attribute. Custom periods require historical snapshots of at least that age. History retention scales to the longest configured period (plus five days). JSON input remains supported via `--config` for backward compatibility.
 
 
+## Development
+
+Run `npm test` to execute the test suite.
+
 ## Documentation
 
 [Full setup and configuration guide](docs/manual.md) — ranking semantics, discovery rules, YAML examples, deployment, and limitations.
+
+MIT License.
