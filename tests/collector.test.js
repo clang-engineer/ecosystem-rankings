@@ -215,3 +215,27 @@ test('rejects invalid metadata exclusion patterns before searching', async () =>
   }] }));
   await assert.rejects(collect({ config, output, history, fetchImpl: () => assert.fail('unexpected request') }), /Invalid exclude_patterns for themes/);
 });
+
+
+test('paginates discovery and stops on a short page', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ecosystem-rankings-'));
+  const config = join(dir, 'ecosystems.json'), output = join(dir, 'rankings.json'), history = join(dir, 'history.json');
+  await writeFile(config, JSON.stringify({ecosystems:[{id:'test',name:'Test',source:'github',topic:'colorscheme',limit:300}]}));
+  const pages = [];
+  const fetchImpl = async url => {
+    if (!url.includes('/search/repositories')) return {ok:false};
+    const params = new URL(url).searchParams;
+    const page = Number(params.get('page') || 1);
+    pages.push(page);
+    assert.equal(params.get('per_page'), '100');
+    const items = Array.from({length:page === 1 ? 100 : 25}, (_,i) => {
+      const name = 'theme-' + ((page-1)*100+i);
+      return {full_name:'owner/'+name,name,stargazers_count:1000-i};
+    });
+    return {ok:true,json:async()=>({total_count:125,items})};
+  };
+  await collect({config,output,history,fetchImpl});
+  const data = JSON.parse(await readFile(output,'utf8'));
+  assert.deepEqual(pages,[1,2]);
+  assert.equal(data.categories[0].items.length,125);
+});
