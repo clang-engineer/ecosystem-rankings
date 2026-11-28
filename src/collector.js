@@ -87,8 +87,8 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     if (!Array.isArray(repositories) || repositories.some(name => !/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(name))) throw Error(`Invalid repositories for ${category.id}`);
     if ((mode === 'curated' && repositories.length === 0) || (mode === 'topic' && !category.topic && !(category.searches?.length) && repositories.length === 0)) throw Error(`Provide topic, searches or repositories for ${category.id}`);
     const searches = category.searches ?? [];
-    if (!Array.isArray(searches) || searches.length > 5 || searches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150)) throw Error(`Invalid searches for ${category.id}`);
-    const limit = Math.min(100, Math.max(1, Number(category.limit) || 20));
+    if (!Array.isArray(searches) || searches.length > 10 || searches.some(q => typeof q !== 'string' || !q.trim() || q.length > 150)) throw Error(`Invalid searches for ${category.id}`);
+    const limit = Math.min(1000, Math.max(1, Math.floor(Number(category.limit) || 20)));
     const minStars = category.min_stars ?? 0;
     if (!Number.isInteger(minStars) || minStars < 0) throw Error(`Invalid min_stars for ${category.id}`);
     const readmeSearches = category.readme_searches ?? [];
@@ -105,11 +105,21 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     const previousItems = previousByCategory.get(category.id) || [];
     let readmeChecks = 0;
     const staleIds = new Set();
+    const searchRepositories = async query => {
+      const items = [];
+      const perPage = Math.min(100, limit);
+      const q = encodeURIComponent(query + (minStars ? ` stars:>=${minStars}` : ''));
+      for (let page = 1; items.length < limit; page++) {
+        await throttleSearch();
+        const result = await request(`https://api.github.com/search/repositories?q=${q}&sort=stars&order=desc&per_page=${perPage}${page > 1 ? `&page=${page}` : ''}`);
+        const batch = result.items || [];
+        items.push(...batch);
+        if (batch.length < perPage || (Number.isFinite(result.total_count) && items.length >= result.total_count)) break;
+      }
+      return items.slice(0, limit);
+    };
     for (const query of queries) {
-      const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query + (minStars ? ` stars:>=${minStars}` : ''))}&sort=stars&order=desc&per_page=${limit}`;
-      await throttleSearch();
-      const result = await request(url);
-      for (const repo of result.items || []) {
+      for (const repo of await searchRepositories(query)) {
         if (!repo.archived && !repo.fork) merged.set(repo.full_name.toLowerCase(), normalize(repo));
       }
     }
@@ -117,9 +127,7 @@ export async function collect({ config, output, history, token, fetchImpl = fetc
     // as the requested type near the beginning of its README.
     const readmeStats = { candidates: 0, accepted: 0 };
     for (const phrase of mode === 'topic' ? readmeSearches : []) {
-      await throttleSearch();
-      const result = await request(`https://api.github.com/search/repositories?q=${encodeURIComponent(phrase + ' in:readme' + (minStars ? ` stars:>=${minStars}` : ''))}&sort=stars&order=desc&per_page=${limit}`);
-      for (const repo of result.items || []) {
+      for (const repo of await searchRepositories(phrase + ' in:readme')) {
         if (repo.archived || repo.fork || merged.has(repo.full_name.toLowerCase())) continue;
         readmeStats.candidates++;
         if (readmeChecks >= MAX_README_CHECKS) break;
