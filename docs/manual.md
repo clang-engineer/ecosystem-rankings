@@ -80,22 +80,7 @@ Explicit repositories are fetched individually, merged case-insensitively with t
 
 ## YAML configuration
 
-```yaml
-viewer:
-  default_period: 7
-periods: [7, 30, 0] # 0 = all-time; positive numbers = days
-ecosystems:
-  - id: terminal-file-managers
-    name: Terminal File Managers
-    source: github
-    topic: terminal-file-manager
-    limit: 30
-    repositories:
-      - sxyazi/yazi
-      - ranger/ranger
-```
-
-The collector writes `periods` and `defaultPeriod` into `rankings.json`; the Viewer requires no separate period attribute. Custom periods require historical snapshots of at least that age. History retention scales to the longest configured period (plus five days). JSON input remains supported via `--config` for backward compatibility.
+See [YAML configuration in the README](../README.md#yaml-configuration).
 
 ## Discovery modes and exclusions
 
